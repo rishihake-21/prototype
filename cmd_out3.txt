@@ -1,0 +1,46 @@
+
+  Dropping all tables  484.30ms DONE
+
+   INFO  Preparing database.  
+
+  Creating migration table  47.24ms DONE
+
+   INFO  Running migrations.  
+
+  0001_01_01_000000_create_users_table  271.62ms DONE
+  0001_01_01_000001_create_cache_table  178.06ms DONE
+  0001_01_01_000002_create_jobs_table  351.43ms DONE
+  2026_02_23_103912_create_departments_table  108.71ms DONE
+  2026_02_23_103918_add_role_fields_to_users_table  772.31ms DONE
+  2026_02_23_103919_create_syllabi_table  392.65ms DONE
+  2026_02_23_103920_create_syllabus_reviews_table  246.94ms DONE
+  2026_02_23_103921_create_syllabus_versions_table  293.32ms DONE
+  2026_02_23_103922_create_audit_logs_table  165.15ms DONE
+  2026_02_23_124651_add_level_specific_fields_to_syllabi_table  3s DONE
+  2026_02_23_140000_add_missing_syllabus_fields  834.17ms DONE
+  2026_02_25_053516_create_roles_table  57.32ms DONE
+  2026_02_25_053534_create_course_department_table  286.65ms DONE
+  2026_02_25_053604_create_notifications_table  135.43ms DONE
+  2026_02_25_053653_update_syllabus_reviews_add_status_options  18.34ms DONE
+  2026_02_25_054004_update_users_table_add_role_id_foreign_key  434.48ms DONE
+  2026_02_25_060500_update_syllabi_status_add_changes_requested  150.38ms DONE
+  2026_02_25_061000_add_scheme_type_to_syllabi_table  177.00ms DONE
+  2026_03_04_000001_update_users_structure_for_srs  752.84ms DONE
+  2026_03_04_100001_create_programmes_table  127.01ms DONE
+  2026_03_04_100002_create_programme_levels_table  167.64ms DONE
+  2026_03_04_100003_create_programme_structure_table  276.54ms DONE
+  2026_03_04_100004_create_courses_table  274.16ms DONE
+  2026_03_04_100005_create_award_class_courses_table  260.69ms DONE
+  2026_03_04_100005_create_course_programme_departments_table  254.55ms DONE
+  2026_03_04_100006_create_sample_paths_table  287.80ms DONE
+  2026_03_05_093146_add_department_id_to_programmes_table  232.40ms DONE
+  2026_03_05_093155_create_course_assignments_table  659.34ms DONE
+  2026_03_05_093205_add_course_id_to_syllabi_table  344.22ms DONE
+  2026_03_06_144122_add_scheme_limits_to_programme_levels_table  802.81ms DONE
+  2026_03_06_144637_add_year_term_to_courses_table  307.80ms DONE
+  2026_03_06_145455_add_assignment_id_to_syllabi_table  345.69ms DONE
+  2026_03_06_180000_add_scheme_type_to_programmes_table  123.15ms DONE
+
+
+   INFO  Seeding database.  
+

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Alpine.js</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body>
+    <div x-data="testData()">
+        <h1>Alpine.js Test</h1>
+        <p>Function exists: <span x-text="isFunctionAvailable()"></span></p>
+        <p>Current step: <span x-text="currentStep"></span></p>
+        <button @click="nextStep()">Next</button>
+    </div>
+
+    <script>
+        function testData() {
+            return {
+                currentStep: 0,
+                isFunctionAvailable() {
+                    // Check if syllabusForm function exists
+                    return typeof window.syllabusForm === 'function' ? 'YES' : 'NO';
+                },
+                nextStep() {
+                    this.currentStep++;
+                }
+            };
+        }
+    </script>
+</body>
+</html>

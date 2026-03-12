@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreSyllabusRequest;
 use App\Http\Requests\UpdateSyllabusRequest;
+use App\Models\Programme;
 use App\Models\Syllabus;
 use App\Services\DocxService;
 use App\Services\PdfService;
@@ -57,14 +58,53 @@ class SyllabusController extends Controller
         return view('syllabi.index', compact('syllabi'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return view('syllabi.create');
+        $assignmentId = $request->query('assignment');
+        $assignment = null;
+        
+        if ($assignmentId) {
+            $assignment = \App\Models\CourseAssignment::with(['course.programme', 'course.level', 'syllabi'])->find($assignmentId);
+            
+            // Authorization: assignment must belong to current user
+            if ($assignment && $assignment->faculty_user_id !== auth()->id()) {
+                abort(403, 'Unauthorized access to assignment.');
+            }
+
+            // If a draft/rejected copy already exists for this assignment, redirect to edit instead of showing create form
+            if ($assignment) {
+                $existing = $assignment->syllabi()->where('submitted_by', auth()->id())->first();
+                if ($existing && $existing->canBeEdited()) {
+                    return redirect()->route('syllabi.edit', $existing)
+                        ->with('info', 'You already have a draft for this assignment. Pick up where you left off.');
+                }
+            }
+        }
+
+        $programmesMetadata = Programme::where('status', Programme::STATUS_ACTIVE)
+            ->get(['code', 'scheme_type'])
+            ->mapWithKeys(fn ($programme) => [
+                $programme->code => Programme::normalizeSchemeType($programme->scheme_type),
+            ])
+            ->toArray();
+
+        return view('syllabi.create', compact('assignment', 'programmesMetadata'));
     }
 
     public function store(StoreSyllabusRequest $request)
     {
         $syllabus = $this->syllabusService->create($request->validated(), auth()->user());
+
+        if ($request->input('status') === Syllabus::STATUS_SUBMITTED) {
+            try {
+                $this->workflowService->submit($syllabus, auth()->user());
+                return redirect()->route('syllabi.index')
+                    ->with('success', 'Syllabus created and submitted for review.');
+            } catch (\Exception $e) {
+                return redirect()->route('syllabi.edit', $syllabus)
+                    ->with('warning', 'Syllabus saved as draft, but automatic submission failed: ' . $e->getMessage());
+            }
+        }
 
         return redirect()->route('syllabi.edit', $syllabus)
             ->with('success', 'Syllabus created successfully.');
@@ -78,7 +118,9 @@ class SyllabusController extends Controller
 
         $syllabus->load(['creator', 'departments', 'approver', 'reviews.reviewer']);
 
-        return view('syllabi.show', compact('syllabus'));
+        $canEdit = $this->syllabusService->canEdit($syllabus, auth()->user());
+
+        return view('syllabi.show', compact('syllabus', 'canEdit'));
     }
 
     public function edit(Syllabus $syllabus)
@@ -87,12 +129,35 @@ class SyllabusController extends Controller
             abort(403);
         }
 
-        return view('syllabi.edit', compact('syllabus'));
+        // Provide a plain array version of the syllabus (with departments)
+        // for the Alpine.js form to hydrate safely.
+        $syllabus->load('departments');
+        $syllabusData = $syllabus->toArray();
+
+        $programmesMetadata = Programme::where('status', Programme::STATUS_ACTIVE)
+            ->get(['code', 'scheme_type'])
+            ->mapWithKeys(fn ($programme) => [
+                $programme->code => Programme::normalizeSchemeType($programme->scheme_type),
+            ])
+            ->toArray();
+
+        return view('syllabi.edit', compact('syllabus', 'syllabusData', 'programmesMetadata'));
     }
 
     public function update(UpdateSyllabusRequest $request, Syllabus $syllabus)
     {
         $this->syllabusService->update($syllabus, $request->validated(), auth()->user());
+
+        if ($request->input('status') === Syllabus::STATUS_SUBMITTED) {
+            try {
+                $this->workflowService->submit($syllabus, auth()->user());
+                return redirect()->route('syllabi.index')
+                    ->with('success', 'Syllabus updated and submitted for review.');
+            } catch (\Exception $e) {
+                return redirect()->route('syllabi.edit', $syllabus)
+                    ->with('warning', 'Syllabus changes saved as draft, but submission failed: ' . $e->getMessage());
+            }
+        }
 
         return redirect()->route('syllabi.edit', $syllabus)
             ->with('success', 'Syllabus updated successfully.');
@@ -233,3 +298,7 @@ class SyllabusController extends Controller
         return $this->docxService->download($syllabus);
     }
 }
+
+
+
+
