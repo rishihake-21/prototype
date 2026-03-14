@@ -60,7 +60,7 @@ class SamplePathController extends Controller
 
         // Re-insert
         $assignments = $request->input('assignments', []);
-        // assignments is sent as "term_N[course_id]" → we receive it as
+        // assignments is sent as "term_N[course_id]" -> we receive it as
         // assignments[term_N] = [course_id1, course_id2, ...]
         foreach ($request->input('terms', []) as $term => $courseIds) {
             if (!is_array($courseIds)) continue;

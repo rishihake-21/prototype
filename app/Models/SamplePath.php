@@ -34,12 +34,12 @@ class SamplePath extends Model
     public static function termLabel(int $term): string
     {
         $labels = [
-            1 => 'Odd – 1st Year',
-            2 => 'Even – 1st Year',
-            3 => 'Odd – 2nd Year',
-            4 => 'Even – 2nd Year',
-            5 => 'Odd – 3rd Year',
-            6 => 'Even – 3rd Year',
+            1 => 'Odd - 1st Year',
+            2 => 'Even - 1st Year',
+            3 => 'Odd - 2nd Year',
+            4 => 'Even - 2nd Year',
+            5 => 'Odd - 3rd Year',
+            6 => 'Even - 3rd Year',
         ];
         return $labels[$term] ?? "Term $term";
     }

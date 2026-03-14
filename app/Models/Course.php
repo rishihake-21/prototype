@@ -57,7 +57,7 @@ class Course extends Model
         return ['Elective I', 'Elective II', 'Elective III', 'Elective IV'];
     }
 
-    // ── Relationships ──────────────────────────────────────────────────────
+    // -- Relationships --
 
     public function programme(): BelongsTo
     {
@@ -84,7 +84,7 @@ class Course extends Model
         return $this->hasMany(CourseAssessment::class);
     }
 
-    // ── Computed helpers ───────────────────────────────────────────────────
+    // -- Computed helpers --
 
     public function computedTotalHours(): int
     {
@@ -96,7 +96,7 @@ class Course extends Model
         return $this->assessments()->sum('max_marks');
     }
 
-    // ── Boot ───────────────────────────────────────────────────────────────
+    // -- Boot --
 
     protected static function boot(): void
     {

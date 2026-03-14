@@ -12,7 +12,15 @@ class SchemeAssessmentComponent extends Model
         'component_code',
         'component_name',
         'type',
+        'value_kind',
+        'is_input',
+        'contributes_to_total',
         'display_order',
+    ];
+
+    protected $casts = [
+        'is_input' => 'boolean',
+        'contributes_to_total' => 'boolean',
     ];
 
     public function scheme()
@@ -32,6 +40,6 @@ class SchemeAssessmentComponent extends Model
 
     public function isLeaf()
     {
-        return $this->children()->count() === 0;
+        return !$this->children()->exists();
     }
 }

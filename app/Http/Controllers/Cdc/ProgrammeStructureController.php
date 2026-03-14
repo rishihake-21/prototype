@@ -81,7 +81,10 @@ class ProgrammeStructureController extends Controller
         }
 
         if ($errors) {
-            return redirect()->back()->with('error', implode(' | ', $errors))->withInput();
+            return redirect()
+                ->back()
+                ->with('structure_errors', $errors)
+                ->withInput();
         }
 
         return redirect()->route('cdc.courses.index', $programme)

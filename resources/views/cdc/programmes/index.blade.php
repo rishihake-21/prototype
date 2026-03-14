@@ -58,7 +58,7 @@
                                 {{ ucfirst($prog->status) }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-gray-600">{{ $prog->creator?->name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ $prog->creator?->name ?? '-' }}</td>
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <a href="{{ route('cdc.programmes.show', $prog) }}"

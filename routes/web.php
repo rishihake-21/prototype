@@ -89,10 +89,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Level-wise Course Definition (Bulk & Individual)
         Route::get('programmes/{programme}/courses',
             [CourseController::class, 'index'])->name('courses.index');
-        Route::get('programmes/{programme}/levels/{level}/bulk-edit',
-            [CourseController::class, 'bulkEdit'])->name('courses.bulk-edit');
-        Route::put('programmes/{programme}/levels/{level}/bulk-update',
-            [CourseController::class, 'bulkUpdate'])->name('courses.bulk-update');
         
         Route::get('programmes/{programme}/courses/create',
             [CourseController::class, 'create'])->name('courses.create');
@@ -130,4 +126,3 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ── API: Course Data Fetching ──────────────────────────────────────────
     Route::get('api/courses/{code}', [CourseController::class, 'apiShow'])->name('api.courses.show');
 });
-

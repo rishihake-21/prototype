@@ -6,7 +6,7 @@
     <div class="mb-6">
         <a href="{{ route('cdc.programmes.index') }}"
            class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline">
-            ← Back to Programmes
+            <- Back to Programmes
         </a>
         <h1 class="mt-2 text-2xl font-bold text-gray-900">
             {{ $programme ? 'Edit Programme' : 'New Programme' }}

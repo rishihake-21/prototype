@@ -27,7 +27,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            <span x-text="calculating ? 'Calculating…' : 'Calculate from Courses'"></span>
+            <span x-text="calculating ? 'Calculating...' : 'Calculate from Courses'"></span>
         </button>
     </div>
 
@@ -36,7 +36,16 @@
         {{ session('success') }}
     </div>
     @endif
-    @if(session('error'))
+    @if(session('structure_errors'))
+    <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div class="font-semibold mb-2">Please fix these issues:</div>
+        <ul class="list-disc list-inside space-y-1">
+            @foreach((array) session('structure_errors') as $msg)
+                <li>{{ $msg }}</li>
+            @endforeach
+        </ul>
+    </div>
+    @elseif(session('error'))
     <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
         {{ session('error') }}
     </div>
@@ -199,7 +208,7 @@
                         {{-- Notes --}}
                         <td class="px-3 py-2 border border-gray-200">
                             <input type="text" name="rows[{{ $level->id }}][notes]"
-                                   value="{{ $s?->notes }}" placeholder="Optional notes…"
+                                   value="{{ $s?->notes }}" placeholder="Optional notes..."
                                    class="w-full bg-transparent border-none text-xs text-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-400 rounded px-1">
                         </td>
                     </tr>
@@ -236,7 +245,7 @@
 
     {{-- Abbreviations footnote --}}
     <p class="mt-4 text-xs text-gray-500">
-        <strong>Abbreviations:</strong> TH – Theory, TU – Tutorial, PR – Practical
+        <strong>Abbreviations:</strong> TH - Theory, TU - Tutorial, PR - Practical
     </p>
 </div>
 

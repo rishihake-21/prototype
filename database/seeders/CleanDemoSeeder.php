@@ -114,75 +114,74 @@ class CleanDemoSeeder extends Seeder
             );
         }
 
-        // Seed K-Scheme component hierarchy
-        $schemeStructure = [
+        // Seed K-Scheme components split into Learning vs Assessment
+        $learningStructure = [
             [
                 'name' => 'Learning Scheme',
                 'children' => [
-                    [
-                        'name' => 'Actual Contact Hours / Week',
-                        'children' => ['CL', 'TL', 'LL', 'Practical'],
-                    ],
-                    [
-                        'name' => 'Self Learning (Activity / Assignment / Micro Project)',
-                        'children' => [],
-                    ],
-                    [
-                        'name' => 'Notional Learning Hours / Week',
-                        'children' => [],
-                    ],
-
+                    ['name' => 'Actual Contact Hours / Week', 'columns' => ['CL', 'TL', 'LL', 'Practical']],
+                    ['name' => 'Self Learning (Activity / Assignment / Micro Project)', 'columns' => []],
+                    ['name' => 'Notional Learning Hours / Week', 'columns' => []],
                 ]
             ],
             [
                 'name' => 'Credits',
                 'children' => [],
             ],
+        ];
+
+        $assessmentStructure = [
             [
                 'name' => 'Assessment Scheme',
                 'children' => [
-                    [
-                        'name' => 'Paper Duration',
-                        'children' => [],
-                    ],
-                    [
-                        'name' => 'Theory',
-                        'children' => ['FA-TH (Max)', 'SA-TH (Max)', 'Total (TH)', 'Min (TH)'],
-                    ],
-                    [
-                        'name' => 'Practical',
-                        'children' => ['FA-PR (Max)', 'SA-PR (Max)', 'Total (PR)', 'Min (PR)'],
-                    ],
-                    [
-                        'name' => 'SLA',
-                        'children' => ['Max (SLA)', 'Min (SLA)'],
-                    ],
+                    ['name' => 'Paper Duration', 'columns' => []],
+                    ['name' => 'Theory', 'columns' => ['FA-TH (Max)', 'SA-TH (Max)', 'Total (TH)', 'Min (TH)']],
+                    ['name' => 'Practical', 'columns' => ['FA-PR (Max)', 'SA-PR (Max)', 'Total (PR)', 'Min (PR)']],
+                    ['name' => 'SLA', 'columns' => ['Max (SLA)', 'Min (SLA)']],
                 ]
             ]
         ];
 
         $displayOrder = 0;
-        foreach ($schemeStructure as $level1) {
-            $l1Node = $scheme->assessmentComponents()->firstOrCreate(
-            ['component_code' => \Illuminate\Support\Str::slug($level1['name']), 'parent_id' => null],
-            ['component_name' => $level1['name'], 'display_order' => $displayOrder++]
+
+        foreach ($learningStructure as $l1) {
+            $l1Node = $scheme->learningComponents()->firstOrCreate(
+                ['component_code' => \Illuminate\Support\Str::slug($l1['name']), 'parent_id' => null],
+                ['component_name' => $l1['name'], 'display_order' => $displayOrder++]
             );
 
-            foreach ($level1['children'] as $level2) {
-                // If it's a string, it means it's a leaf node without children in the array?
-                // Wait, based on the array structure: level 2 are ALWAYS arrays with 'name' and 'children'.
-                $l2Node = $scheme->assessmentComponents()->firstOrCreate(
-                ['component_code' => \Illuminate\Support\Str::slug($level1['name'] . ' ' . $level2['name']), 'parent_id' => $l1Node->id],
-                ['component_name' => $level2['name'], 'display_order' => $displayOrder++]
+            foreach (($l1['children'] ?? []) as $l2) {
+                $l2Node = $scheme->learningComponents()->firstOrCreate(
+                    ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name']), 'parent_id' => $l1Node->id],
+                    ['component_name' => $l2['name'], 'display_order' => $displayOrder++]
                 );
 
-                if (isset($level2['children']) && is_array($level2['children'])) {
-                    foreach ($level2['children'] as $level3Name) {
-                        $scheme->assessmentComponents()->firstOrCreate(
-                        ['component_code' => \Illuminate\Support\Str::slug($level1['name'] . ' ' . $level2['name'] . ' ' . $level3Name), 'parent_id' => $l2Node->id],
-                        ['component_name' => $level3Name, 'display_order' => $displayOrder++]
-                        );
-                    }
+                foreach (($l2['columns'] ?? []) as $colName) {
+                    $scheme->learningComponents()->firstOrCreate(
+                        ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name'] . ' ' . $colName), 'parent_id' => $l2Node->id],
+                        ['component_name' => $colName, 'display_order' => $displayOrder++]
+                    );
+                }
+            }
+        }
+
+        foreach ($assessmentStructure as $l1) {
+            $l1Node = $scheme->assessmentComponents()->firstOrCreate(
+                ['component_code' => \Illuminate\Support\Str::slug($l1['name']), 'parent_id' => null],
+                ['component_name' => $l1['name'], 'display_order' => $displayOrder++]
+            );
+
+            foreach (($l1['children'] ?? []) as $l2) {
+                $l2Node = $scheme->assessmentComponents()->firstOrCreate(
+                    ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name']), 'parent_id' => $l1Node->id],
+                    ['component_name' => $l2['name'], 'display_order' => $displayOrder++]
+                );
+
+                foreach (($l2['columns'] ?? []) as $colName) {
+                    $scheme->assessmentComponents()->firstOrCreate(
+                        ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name'] . ' ' . $colName), 'parent_id' => $l2Node->id],
+                        ['component_name' => $colName, 'display_order' => $displayOrder++]
+                    );
                 }
             }
         }

@@ -15,7 +15,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Sample Path (Term-wise Distribution)</h1>
-            <p class="text-sm text-gray-500 mt-1">Recommended course sequence per term — {{ $programme->name }}</p>
+            <p class="text-sm text-gray-500 mt-1">Recommended course sequence per term - {{ $programme->name }}</p>
         </div>
     </div>
 
@@ -69,7 +69,7 @@
                                         {{ $course->elective_group }}
                                     </span>
                                 @endif
-                                <span class="text-[10px] text-gray-400 ml-auto">{{ $course->course_abbr }} · {{ (float)$course->credits }}cr</span>
+                                <span class="text-[10px] text-gray-400 ml-auto">{{ $course->course_abbr }} - {{ (float)$course->credits }}cr</span>
                             </div>
                         </td>
                         <td class="px-3 py-2 border border-gray-200 text-center text-gray-500">

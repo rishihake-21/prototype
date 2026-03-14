@@ -6,7 +6,7 @@
     <div class="mb-6">
         <a href="{{ route('cdc.programmes.show', $programme) }}"
            class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline">
-            ← Back to Programme
+            <- Back to Programme
         </a>
         <h1 class="mt-2 text-2xl font-bold text-gray-900">Courses for Award of Class</h1>
         <p class="text-sm text-gray-500">Select the courses that will be used to compute the final class for <strong>{{ $programme->name }}</strong>.</p>

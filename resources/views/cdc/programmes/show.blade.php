@@ -6,10 +6,10 @@
     <div class="mb-6">
         <a href="{{ route('cdc.programmes.index') }}"
            class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline">
-            ← Back to Programmes
+            <- Back to Programmes
         </a>
         <h1 class="mt-2 text-2xl font-bold text-gray-900">{{ $programme->name }}</h1>
-        <p class="text-sm text-gray-500">{{ $programme->code }} • {{ $programme->academic_year }}</p>
+        <p class="text-sm text-gray-500">{{ $programme->code }} - {{ $programme->academic_year }}</p>
     </div>
 
     {{-- Quick navigation cards --}}
@@ -95,10 +95,10 @@
                 <tr class="hover:bg-gray-50">
                     <td class="px-4 py-3 font-mono text-xs text-gray-700">{{ $level->level_code }}</td>
                     <td class="px-4 py-3 text-gray-900">{{ $level->level_name }}</td>
-                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_courses_offered ?? '—' }}</td>
-                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->courses_to_complete ?? '—' }}</td>
-                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_credits ?? '—' }}</td>
-                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_marks ?? '—' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_courses_offered ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->courses_to_complete ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_credits ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_marks ?? '-' }}</td>
                 </tr>
                 @endforeach
             </tbody>

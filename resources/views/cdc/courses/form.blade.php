@@ -14,7 +14,7 @@
     </div>
 
     <h1 class="text-2xl font-bold text-gray-900 mb-6">
-        {{ $course ? 'Edit Course' : 'Add Course' }} — {{ $programme->name }}
+        {{ $course ? 'Edit Course' : 'Add Course' }} - {{ $programme->name }}
     </h1>
 
     @if($errors->any())
@@ -35,7 +35,7 @@
         @csrf
         @if($course) @method('PUT') @endif
 
-        {{-- ── Section: Identification ────────────────────────────────────── --}}
+        {{-- Section: Identification --}}
         <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-5 mb-4">
             <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-4">Course Identification</h2>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -47,7 +47,7 @@
                         @foreach($programme->levels as $lv)
                             <option value="{{ $lv->id }}"
                                 {{ old('level_id', $course?->level_id) == $lv->id ? 'selected' : '' }}>
-                                {{ $lv->level_code }} – {{ $lv->level_name }}
+                                {{ $lv->level_code }} - {{ $lv->level_name }}
                             </option>
                         @endforeach
                     </select>
@@ -90,7 +90,7 @@
             </div>
         </div>
 
-        {{-- ── Section: Teaching Scheme ──────────────────────────────────── --}}
+        {{-- Section: Teaching Scheme --}}
         <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-5 mb-4">
             <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-4">Teaching Scheme</h2>
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
@@ -115,7 +115,7 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Total Hours</label>
                     <div class="w-full text-center rounded-lg border border-gray-200 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700"
-                         x-text="th + tu + pr"></div>
+                         x-text="(Number(th) || 0) + (Number(tu) || 0) + (Number(pr) || 0)"></div>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Credits <span class="text-red-500">*</span></label>
@@ -125,13 +125,13 @@
                     @error('credits')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
             </div>
-            <p class="mt-2 text-xs text-gray-400">TH – Theory, TU – Tutorial, PR – Practical. Total Hours is auto-calculated.</p>
+            <p class="mt-2 text-xs text-gray-400">TH - Theory, TU - Tutorial, PR - Practical. Total Hours is auto-calculated.</p>
         </div>
 
-        {{-- ── Section: Examination Scheme ──────────────────────────────── --}}
+        {{-- Section: Examination Scheme --}}
         <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-5 mb-4">
             <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-4">Examination Scheme</h2>
-            
+
             <div class="mb-5 border-b border-gray-100 pb-5">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Theory Paper Hrs</label>
                 <input type="number" name="theory_paper_hrs"
@@ -140,19 +140,13 @@
             </div>
 
             <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">Assessment Marks Breakdown</h3>
-            @php
-                $schemeRows = $programme->scheme?->getHeaderRows() ?? [];
-                $leafCols   = $programme->scheme?->getLeafColumns() ?? [];
 
-                // Map existing assessments by component_id if editing
-                $existingMarks = [];
-                if ($course) {
-                    $existingMarks = $course->assessments->pluck('max_marks', 'component_id')->toArray();
-                }
-                $marks = old('assessment_marks', $existingMarks);
+            @php
+                $schemeRows = $schemeRows ?? [];
+                $leafCols = $leafCols ?? [];
             @endphp
-            
-            @if(empty($schemeRows))
+
+            @if(empty($schemeRows) || empty($leafCols))
                 <div class="rounded-lg bg-orange-50 border border-orange-200 p-4 text-sm text-orange-700">
                     <p class="font-medium">No Assessment Columns Defined.</p>
                     <p class="mt-1">Please edit the parent Scheme ({{ $programme->scheme?->name }}) to define assessment columns.</p>
@@ -161,7 +155,7 @@
                 <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm mt-4 mb-6">
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-gray-50 text-gray-700">
-                            @foreach($schemeRows as $rowIndex => $row)
+                            @foreach($schemeRows as $row)
                                 <tr>
                                     @foreach($row as $col)
                                         <th colspan="{{ $col['colspan'] }}" rowspan="{{ $col['rowspan'] }}"
@@ -176,7 +170,7 @@
                             <tr>
                                 @foreach($leafCols as $leaf)
                                     <td class="px-2 py-3 border-r border-gray-200 text-center hover:bg-indigo-50/30 transition">
-                                        <input type="number" name="assessment_marks[{{ $leaf['id'] }}]" 
+                                        <input type="number" name="assessment_marks[{{ $leaf['id'] }}]"
                                                x-model.number="marks[{{ $leaf['id'] }}]" min="0" placeholder="0"
                                                class="w-full min-w-[60px] max-w-[80px] text-center rounded border-gray-300 text-xs py-1.5 focus:ring-2 focus:ring-indigo-500 mx-auto">
                                     </td>
@@ -185,7 +179,7 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <div class="flex justify-end border-t border-gray-100 pt-4">
                     <div class="w-48">
                         <label class="block text-xs font-medium text-gray-700 mb-1">Total Expected Marks</label>
@@ -193,12 +187,12 @@
                              x-text="totalMarks"></div>
                     </div>
                 </div>
-                
-                <p class="mt-2 text-xs text-gray-400 text-right">Total marks are calculated automatically from the leaf values.</p>
+
+                <p class="mt-2 text-xs text-gray-400 text-right">Total marks are calculated automatically from the max-mark leaf values.</p>
             @endif
         </div>
 
-        {{-- ── Section: Classification ───────────────────────────────────── --}}
+        {{-- Section: Classification --}}
         <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-5 mb-6">
             <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-4">Classification</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -223,7 +217,7 @@
                     <select name="elective_group"
                             :required="courseType === 'elective'"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option value="">— Select Group —</option>
+                        <option value="">-- Select Group --</option>
                         @foreach($electiveGroups as $grp)
                             <option value="{{ $grp }}" {{ old('elective_group', $course?->elective_group) === $grp ? 'selected' : '' }}>
                                 {{ $grp }}
@@ -283,7 +277,7 @@ function courseForm() {
         th: {{ old('th_hours', $course?->th_hours ?? 0) }},
         tu: {{ old('tu_hours', $course?->tu_hours ?? 0) }},
         pr: {{ old('pr_hours', $course?->pr_hours ?? 0) }},
-        marks: @json($marks),
+        marks: @json($marks ?? []),
         courseType: '{{ old('course_type', $course?->course_type ?? 'compulsory') }}',
         isCommon: {{ old('is_common_course', $course?->is_common_course ?? false) ? 'true' : 'false' }},
         get totalMarks() {
@@ -291,7 +285,7 @@ function courseForm() {
         },
         init() {
             // Ensure all columns exist in marks object for reactivity
-            @foreach($leafCols as $leaf)
+            @foreach(($leafCols ?? []) as $leaf)
                 if (this.marks[{{ $leaf['id'] }}] === undefined) {
                     this.marks[{{ $leaf['id'] }}] = null;
                 }
@@ -302,3 +296,4 @@ function courseForm() {
 </script>
 @endpush
 @endsection
+
