@@ -89,11 +89,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Level-wise Course Definition (Bulk & Individual)
         Route::get('programmes/{programme}/courses',
             [CourseController::class, 'index'])->name('courses.index');
-        Route::get('programmes/{programme}/levels/{level}/bulk-edit',
-            [CourseController::class, 'bulkEdit'])->name('courses.bulk-edit');
-        Route::put('programmes/{programme}/levels/{level}/bulk-update',
-            [CourseController::class, 'bulkUpdate'])->name('courses.bulk-update');
-        
         Route::get('programmes/{programme}/courses/create',
             [CourseController::class, 'create'])->name('courses.create');
         Route::post('programmes/{programme}/courses',
@@ -106,6 +101,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             [CourseController::class, 'destroy'])->name('courses.destroy');
         Route::post('courses/{course}/clone',
             [CourseController::class, 'clone'])->name('courses.clone');
+        Route::post('programmes/{programme}/courses/{course}/assign-elective',
+            [CourseController::class, 'assignElective'])->name('courses.assign-elective');
 
         // Sample Path (term-wise distribution)
         Route::get('programmes/{programme}/sample-path',
@@ -127,7 +124,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('assignments/{assignment}', [\App\Http\Controllers\Hod\AssignmentController::class, 'destroy'])->name('assignments.destroy');
     });
 
-    // ── API: Course Data Fetching ──────────────────────────────────────────
+    // ── API: Helpers ──────────────────────────────────────────
     Route::get('api/courses/{code}', [CourseController::class, 'apiShow'])->name('api.courses.show');
+    Route::get('api/schemes/{scheme}/leaf-components', [\App\Http\Controllers\Cdc\SchemeController::class, 'apiLeafComponents'])->name('api.schemes.leaf-components');
 });
-

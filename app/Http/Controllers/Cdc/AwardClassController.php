@@ -19,6 +19,7 @@ class AwardClassController extends Controller
         $courses = $programme->courses()
             ->with('level')
             ->whereNull('deleted_at')
+            ->where('is_placeholder', false)
             ->orderBy('level_id')
             ->orderBy('course_code')
             ->get();

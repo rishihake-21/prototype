@@ -93,7 +93,7 @@ class SchemeController extends Controller
 
     public function edit(Scheme $scheme)
     {
-        $scheme->load('levels', 'assessmentComponents');
+        $scheme->load(['levels', 'assessmentComponents']);
         return view('cdc.schemes.create', compact('scheme'));
     }
 
@@ -137,8 +137,8 @@ class SchemeController extends Controller
                 }
             }
             else {
-                $newLevel = $scheme->levels()->create($levelData);
-                $keptIds[] = $newLevel->id;
+                $level = $scheme->levels()->create($levelData);
+                $keptIds[] = $level->id;
             }
         }
 
@@ -196,5 +196,10 @@ class SchemeController extends Controller
 
         $scheme->delete();
         return redirect()->route('cdc.schemes.index')->with('success', 'Scheme deleted successfully.');
+    }
+
+    public function apiLeafComponents(Scheme $scheme)
+    {
+        return response()->json($scheme->getLeafColumns());
     }
 }

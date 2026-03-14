@@ -57,12 +57,60 @@ class Scheme extends Model
 
     public function getHeaderRows()
     {
-        $rows = [[], [], []];
+        return $this->buildHeaderRows($this->assessmentComponents()->orderBy('display_order')->get());
+    }
+
+    public function getLeafColumns()
+    {
+        return $this->buildLeafColumns($this->assessmentComponents()->orderBy('display_order')->get());
+    }
+
+    public function getAssessmentHeaderRows(): array
+    {
+        return $this->buildHeaderRows($this->getAssessmentComponentsSubset());
+    }
+
+    public function getAssessmentLeafColumns(): array
+    {
+        return $this->buildLeafColumns($this->getAssessmentComponentsSubset());
+    }
+
+    private function getAssessmentComponentsSubset()
+    {
         $allComponents = $this->assessmentComponents()->orderBy('display_order')->get();
-        $l1Nodes = $allComponents->where('parent_id', null);
+        $topLevel = $allComponents->where('parent_id', null);
+
+        $assessmentRoot = $topLevel
+            ->first(fn ($component) => str_contains(strtolower($component->component_name), 'assessment'));
+
+        if (! $assessmentRoot) {
+            return $allComponents;
+        }
+
+        return $allComponents->filter(function ($component) use ($allComponents, $assessmentRoot) {
+            $current = $component;
+
+            while ($current) {
+                if ($current->id === $assessmentRoot->id) {
+                    return true;
+                }
+
+                $current = $current->parent_id
+                    ? $allComponents->firstWhere('id', $current->parent_id)
+                    : null;
+            }
+
+            return false;
+        })->values();
+    }
+
+    private function buildHeaderRows($components): array
+    {
+        $rows = [[], [], []];
+        $l1Nodes = $components->where('parent_id', null);
 
         foreach ($l1Nodes as $l1) {
-            $l2Nodes = $allComponents->where('parent_id', $l1->id);
+            $l2Nodes = $components->where('parent_id', $l1->id);
             $l1Span = 0;
 
             if ($l2Nodes->isEmpty()) {
@@ -72,18 +120,14 @@ class Scheme extends Model
                     'code' => $l1->component_code,
                     'colspan' => 1,
                     'rowspan' => 3,
-                    'is_leaf' => true
+                    'is_leaf' => true,
                 ];
                 continue;
             }
 
             foreach ($l2Nodes as $l2) {
-                $l3Nodes = $allComponents->where('parent_id', $l2->id);
-                if ($l3Nodes->isEmpty()) {
-                    $l1Span += 1;
-                } else {
-                    $l1Span += $l3Nodes->count();
-                }
+                $l3Nodes = $components->where('parent_id', $l2->id);
+                $l1Span += $l3Nodes->isEmpty() ? 1 : $l3Nodes->count();
             }
 
             $rows[0][] = [
@@ -92,11 +136,12 @@ class Scheme extends Model
                 'code' => $l1->component_code,
                 'colspan' => $l1Span,
                 'rowspan' => 1,
-                'is_leaf' => false
+                'is_leaf' => false,
             ];
 
             foreach ($l2Nodes as $l2) {
-                $l3Nodes = $allComponents->where('parent_id', $l2->id);
+                $l3Nodes = $components->where('parent_id', $l2->id);
+
                 if ($l3Nodes->isEmpty()) {
                     $rows[1][] = [
                         'id' => $l2->id,
@@ -104,68 +149,71 @@ class Scheme extends Model
                         'code' => $l2->component_code,
                         'colspan' => 1,
                         'rowspan' => 2,
-                        'is_leaf' => true
+                        'is_leaf' => true,
                     ];
-                } else {
-                    $rows[1][] = [
-                        'id' => $l2->id,
-                        'name' => $l2->component_name,
-                        'code' => $l2->component_code,
-                        'colspan' => $l3Nodes->count(),
-                        'rowspan' => 1,
-                        'is_leaf' => false
-                    ];
+                    continue;
+                }
 
-                    foreach ($l3Nodes as $l3) {
-                        $rows[2][] = [
-                            'id' => $l3->id,
-                            'name' => $l3->component_name,
-                            'code' => $l3->component_code,
-                            'colspan' => 1,
-                            'rowspan' => 1,
-                            'is_leaf' => true
-                        ];
-                    }
+                $rows[1][] = [
+                    'id' => $l2->id,
+                    'name' => $l2->component_name,
+                    'code' => $l2->component_code,
+                    'colspan' => $l3Nodes->count(),
+                    'rowspan' => 1,
+                    'is_leaf' => false,
+                ];
+
+                foreach ($l3Nodes as $l3) {
+                    $rows[2][] = [
+                        'id' => $l3->id,
+                        'name' => $l3->component_name,
+                        'code' => $l3->component_code,
+                        'colspan' => 1,
+                        'rowspan' => 1,
+                        'is_leaf' => true,
+                    ];
                 }
             }
         }
 
-        // Return only non-empty rows for exact structural match
-        return array_values(array_filter($rows, function ($r) { return count($r) > 0; }));
+        return array_values(array_filter($rows, fn ($row) => count($row) > 0));
     }
 
-    public function getLeafColumns()
+    private function buildLeafColumns($components): array
     {
         $leaves = [];
-        $allComponents = $this->assessmentComponents()->orderBy('display_order')->get();
-        $l1Nodes = $allComponents->where('parent_id', null);
+        $l1Nodes = $components->where('parent_id', null);
 
         foreach ($l1Nodes as $l1) {
-            $l2Nodes = $allComponents->where('parent_id', $l1->id);
+            $l2Nodes = $components->where('parent_id', $l1->id);
+
             if ($l2Nodes->isEmpty()) {
                 $leaves[] = [
                     'id' => $l1->id,
                     'name' => $l1->component_name,
-                    'code' => $l1->component_code
+                    'code' => $l1->component_code,
                 ];
-            } else {
-                foreach ($l2Nodes as $l2) {
-                    $l3Nodes = $allComponents->where('parent_id', $l2->id);
-                    if ($l3Nodes->isEmpty()) {
-                        $leaves[] = [
-                            'id' => $l2->id,
-                            'name' => $l2->component_name,
-                            'code' => $l2->component_code
-                        ];
-                    } else {
-                        foreach ($l3Nodes as $l3) {
-                            $leaves[] = [
-                                'id' => $l3->id,
-                                'name' => $l3->component_name,
-                                'code' => $l3->component_code
-                            ];
-                        }
-                    }
+                continue;
+            }
+
+            foreach ($l2Nodes as $l2) {
+                $l3Nodes = $components->where('parent_id', $l2->id);
+
+                if ($l3Nodes->isEmpty()) {
+                    $leaves[] = [
+                        'id' => $l2->id,
+                        'name' => $l2->component_name,
+                        'code' => $l2->component_code,
+                    ];
+                    continue;
+                }
+
+                foreach ($l3Nodes as $l3) {
+                    $leaves[] = [
+                        'id' => $l3->id,
+                        'name' => $l3->component_name,
+                        'code' => $l3->component_code,
+                    ];
                 }
             }
         }

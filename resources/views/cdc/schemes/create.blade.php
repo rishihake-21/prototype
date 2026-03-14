@@ -94,19 +94,21 @@
                         <div class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 group">
                             <div class="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-400 group-hover:text-indigo-600 transition" x-text="index + 1"></div>
                             
-                            <div class="flex-1 grid grid-cols-5 gap-3">
-                                <div class="col-span-2">
-                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Code</label>
-                                    <input type="text" :name="'levels['+index+'][level_code]'" x-model="level.level_code" placeholder="Level-1" required
-                                           class="w-full rounded-md border-gray-200 bg-white px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500">
+                            <div class="flex-1 space-y-3">
+                                <div class="grid grid-cols-5 gap-3">
+                                    <div class="col-span-2">
+                                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Code</label>
+                                        <input type="text" :name="'levels['+index+'][level_code]'" x-model="level.level_code" placeholder="Level-1" required
+                                               class="w-full rounded-md border-gray-200 bg-white px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Name</label>
+                                        <input type="text" :name="'levels['+index+'][level_name]'" x-model="level.level_name" placeholder="Basic Science & Mathematics" required
+                                               class="w-full rounded-md border-gray-200 bg-white px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500">
+                                    </div>
+                                    <input type="hidden" :name="'levels['+index+'][id]'" x-model="level.id">
+                                    <input type="hidden" :name="'levels['+index+'][sort_order]'" :value="index">
                                 </div>
-                                <div class="col-span-3">
-                                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-tight mb-0.5">Name</label>
-                                    <input type="text" :name="'levels['+index+'][level_name]'" x-model="level.level_name" placeholder="Basic Science & Mathematics" required
-                                           class="w-full rounded-md border-gray-200 bg-white px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500">
-                                </div>
-                                <input type="hidden" :name="'levels['+index+'][id]'" x-model="level.id">
-                                <input type="hidden" :name="'levels['+index+'][sort_order]'" :value="index">
                             </div>
 
                             <button type="button" @click="removeLevel(index)"
@@ -273,7 +275,6 @@ function schemeLevels(initialLevels, initialStructure) {
             { level_code: 'Level-4', level_name: 'Applied Courses' },
             { level_code: 'Level-5', level_name: 'Diversified Courses' },
             { level_code: '-', level_name: 'Audit Courses' },
-            
         ],
         schemeStructure: initialStructure && initialStructure.length > 0 ? initialStructure : [
             {
@@ -294,7 +295,10 @@ function schemeLevels(initialLevels, initialStructure) {
             }
         ],
         addLevel() {
-            this.levels.push({ level_code: '', level_name: '' });
+            this.levels.push({ 
+                level_code: '', 
+                level_name: ''
+            });
         },
         removeLevel(index) {
             if (confirm('Are you sure? Removing a level type affects programmes.')) {

@@ -64,6 +64,7 @@
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Courses to<br>Complete</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Compulsory<br>Courses</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Elective<br>Courses</th>
+                        <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Audit<br>Courses</th>
                         <th colspan="4" class="px-3 py-2 text-center border border-indigo-600">Teaching Scheme</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Total<br>Credits</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Total<br>Marks</th>
@@ -85,21 +86,32 @@
                     <tr class="{{ $rowBg }}"
                         x-data="{
                             levelId: {{ $level->id }},
+                            isAudit: {{ $level->isAudit() ? 'true' : 'false' }},
                             th: {{ $s?->th_hours ?? 0 }},
                             tu: {{ $s?->tu_hours ?? 0 }},
                             pr: {{ $s?->pr_hours ?? 0 }},
-                            offered: {{ $s?->total_courses_offered ?? 0 }},
+                            offered: {{ $s?->total_courses_offered ?? 0 }}, // display-only; computed below
                             toComplete: {{ $s?->courses_to_complete ?? 0 }},
                             comp: {{ $s?->compulsory_count ?? 0 }},
                             elec: {{ $s?->elective_count ?? 0 }},
+                            audit: {{ $s?->audit_count ?? 0 }},
+                            credits: {{ $level->isAudit() ? 0 : ($s?->total_credits ?? 0) }},
+                            marks: {{ $level->isAudit() ? 0 : ($s?->total_marks ?? 0) }},
                             get totalHrs() { return this.th + this.tu + this.pr; },
+                            get offeredComputed() { return (this.comp || 0) + (this.elec || 0) + (this.audit || 0); },
                             get warning() {
-                                return this.toComplete > this.offered
-                                    ? 'Cannot exceed courses offered'
-                                    : '';
+                                if (this.toComplete > this.offeredComputed) return 'Cannot exceed courses offered';
+                                return '';
                             }
                         }"
-                        x-init="registerRow($data)">
+                        x-init="
+                            if (isAudit) {
+                                comp = 0; elec = 0;
+                                // keep audit as the controlling number for audit levels
+                                toComplete = audit;
+                            }
+                            registerRow($data)
+                        ">
 
                         {{-- Level code (read-only) --}}
                         <td class="px-3 py-2 text-center font-mono text-xs font-semibold text-gray-700 border border-gray-200">
@@ -115,9 +127,8 @@
 
                         {{-- Total Courses Offered --}}
                         <td class="px-3 py-2 border border-gray-200">
-                            <input type="number" name="rows[{{ $level->id }}][total_courses_offered]"
-                                   x-model.number="offered" min="0"
-                                   class="w-16 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                            <span class="inline-block w-16 text-center font-semibold text-indigo-700" x-text="offeredComputed"></span>
+                            <input type="hidden" name="rows[{{ $level->id }}][total_courses_offered]" :value="offeredComputed">
                         </td>
 
                         {{-- Courses to Complete --}}
@@ -125,8 +136,10 @@
                             <div class="relative">
                                 <input type="number" name="rows[{{ $level->id }}][courses_to_complete]"
                                        x-model.number="toComplete" min="0"
+                                       :readonly="isAudit"
                                        :class="warning ? 'border-red-400' : 'border-gray-200'"
-                                       class="w-16 text-center rounded border text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                                       class="w-16 text-center rounded border text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                                       @input="if (isAudit) toComplete = audit">
                                 <p x-show="warning" x-text="warning" class="absolute -bottom-5 left-0 text-xs text-red-500 whitespace-nowrap z-10"></p>
                             </div>
                         </td>
@@ -135,14 +148,26 @@
                         <td class="px-3 py-2 border border-gray-200">
                             <input type="number" name="rows[{{ $level->id }}][compulsory_count]"
                                    x-model.number="comp" min="0"
-                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                                   :readonly="isAudit"
+                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50"
+                                   @input="if (isAudit) comp = 0">
                         </td>
 
                         {{-- Elective Courses --}}
                         <td class="px-3 py-2 border border-gray-200">
                             <input type="number" name="rows[{{ $level->id }}][elective_count]"
                                    x-model.number="elec" min="0"
-                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                                   :readonly="isAudit"
+                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50"
+                                   @input="if (isAudit) elec = 0">
+                        </td>
+
+                        {{-- Audit Courses --}}
+                        <td class="px-3 py-2 border border-gray-200">
+                            <input type="number" name="rows[{{ $level->id }}][audit_count]"
+                                   x-model.number="audit" min="0"
+                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50"
+                                   @input="if (isAudit) toComplete = audit">
                         </td>
 
                         {{-- TH --}}
@@ -179,7 +204,7 @@
                                 <input type="hidden" name="rows[{{ $level->id }}][total_credits]" value="0">
                             @else
                                 <input type="number" name="rows[{{ $level->id }}][total_credits]"
-                                       value="{{ $s?->total_credits ?? 0 }}" min="0" step="0.5"
+                                       x-model.number="credits" min="0" step="0.5"
                                        class="w-16 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none">
                             @endif
                         </td>
@@ -191,7 +216,7 @@
                                 <input type="hidden" name="rows[{{ $level->id }}][total_marks]" value="0">
                             @else
                                 <input type="number" name="rows[{{ $level->id }}][total_marks]"
-                                       value="{{ $s?->total_marks ?? 0 }}" min="0"
+                                       x-model.number="marks" min="0"
                                        class="w-16 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none">
                             @endif
                         </td>
@@ -212,11 +237,14 @@
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.toComplete"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.comp"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.elec"></td>
+                        <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.audit"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.th"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.tu"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.pr"></td>
                         <td class="px-3 py-3 text-center border border-gray-200 text-indigo-700" x-text="totals.hours"></td>
-                        <td class="px-3 py-3 text-center border border-gray-200" colspan="3"></td>
+                        <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.credits.toFixed(2)"></td>
+                        <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.marks"></td>
+                        <td class="px-3 py-3 text-center border border-gray-200"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -258,11 +286,14 @@ function schemeForm() {
                 toComplete: acc.toComplete + (r.toComplete || 0),
                 comp:       acc.comp       + (r.comp       || 0),
                 elec:       acc.elec       + (r.elec       || 0),
+                audit:      acc.audit      + (r.audit      || 0),
                 th:         acc.th         + (r.th         || 0),
                 tu:         acc.tu         + (r.tu         || 0),
                 pr:         acc.pr         + (r.pr         || 0),
                 hours:      acc.hours      + (r.totalHrs   || 0),
-            }), { offered: 0, toComplete: 0, comp: 0, elec: 0, th: 0, tu: 0, pr: 0, hours: 0 });
+                credits:    acc.credits    + (parseFloat(r.credits) || 0),
+                marks:      acc.marks      + (r.marks      || 0),
+            }), { offered: 0, toComplete: 0, comp: 0, elec: 0, audit: 0, th: 0, tu: 0, pr: 0, hours: 0, credits: 0, marks: 0 });
         },
 
         init() { /* rows register themselves via x-init */ },
@@ -287,11 +318,8 @@ function schemeForm() {
                         row.tu        = vals.tu_hours || 0;
                         row.pr        = vals.pr_hours || 0;
                         row.offered   = vals.total_courses_offered || 0;
-                        // Update the credit/marks inputs directly (they're not x-bound)
-                        const credits = document.querySelector(`input[name="rows[${levelId}][total_credits]"]`);
-                        const marks   = document.querySelector(`input[name="rows[${levelId}][total_marks]"]`);
-                        if (credits) credits.value = vals.total_credits || 0;
-                        if (marks)   marks.value   = vals.total_marks   || 0;
+                        row.credits   = vals.total_credits || 0;
+                        row.marks     = vals.total_marks || 0;
                     }
                 }
                 this.warnings = ['Values recalculated from course definitions. Click "Save Scheme" to persist.'];
@@ -304,10 +332,13 @@ function schemeForm() {
 
         submitForm(e) {
             this.warnings = [];
-            const invalid = this.rows.filter(r => r.toComplete > r.offered);
+            const invalid = this.rows.filter(r => (r.toComplete > ((r.comp||0) + (r.elec||0) + (r.audit||0))));
             if (invalid.length) {
                 invalid.forEach(r => {
-                    this.warnings.push(`Level ID ${r.levelId}: "Courses to Complete" cannot exceed "Total Courses Offered".`);
+                    const offeredComputed = (r.comp||0) + (r.elec||0) + (r.audit||0);
+                    if (r.toComplete > offeredComputed) {
+                        this.warnings.push(`Level ID ${r.levelId}: "Courses to Complete" cannot exceed "Total Courses Offered".`);
+                    }
                 });
                 return;
             }

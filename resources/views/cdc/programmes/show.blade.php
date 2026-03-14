@@ -104,5 +104,83 @@
             </tbody>
         </table>
     </div>
+
+    {{-- At-a-Glance --}}
+    <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl overflow-hidden mt-8">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="font-semibold text-gray-900">At a Glance</h2>
+            <p class="text-xs text-gray-500 mt-1">Course distribution and budget vs actuals per level.</p>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Level</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Comp</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Elec</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Audit</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Offered</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">TH</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">TU</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">PR</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Credits</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Marks</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    @foreach($programme->levels as $level)
+                        @php
+                            $courses = $level->courses ?? collect();
+                            $actualComp  = $courses->where('course_type','compulsory')->count();
+                            $actualElec  = $courses->where('course_type','elective')->count();
+                            $actualAudit = $courses->where('course_type','audit')->count();
+                            $actualOffered = $courses->count();
+
+                            $th = (int) $courses->sum('th_hours');
+                            $tu = (int) $courses->sum('tu_hours');
+                            $pr = (int) $courses->sum('pr_hours');
+                            $credits = (float) $courses->sum('credits');
+                            $marks = (int) $courses->sum('total_marks');
+
+                            $s = $level->structure;
+                            $budgetComp  = $s?->compulsory_count;
+                            $budgetElec  = $s?->elective_count;
+                            $budgetAudit = $s?->audit_count;
+                            $budgetOffered = $s?->total_courses_offered;
+                            $budgetTh = $s?->th_hours;
+                            $budgetTu = $s?->tu_hours;
+                            $budgetPr = $s?->pr_hours;
+                            $budgetCredits = $s?->total_credits;
+                            $budgetMarks = $s?->total_marks;
+
+                            $cell = function($actual, $budget) {
+                                if ($budget === null) return '<span class="text-gray-400">—</span>';
+                                $ok = (string)$actual === (string)$budget;
+                                $cls = $ok ? 'text-green-700' : 'text-amber-700';
+                                return "<span class=\"{$cls}\">{$actual}</span> <span class=\"text-gray-300\">/</span> <span class=\"text-gray-700\">{$budget}</span>";
+                            };
+                        @endphp
+
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">
+                                <div class="font-mono text-xs text-gray-700">{{ $level->level_code }}</div>
+                                <div class="text-xs text-gray-500">{{ $level->level_name }}</div>
+                            </td>
+                            <td class="px-4 py-3 text-right">{!! $cell($actualComp, $budgetComp) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($actualElec, $budgetElec) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($actualAudit, $budgetAudit) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($actualOffered, $budgetOffered) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($th, $budgetTh) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($tu, $budgetTu) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($pr, $budgetPr) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell(number_format($credits, 2), $budgetCredits) !!}</td>
+                            <td class="px-4 py-3 text-right">{!! $cell($marks, $budgetMarks) !!}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 @endsection

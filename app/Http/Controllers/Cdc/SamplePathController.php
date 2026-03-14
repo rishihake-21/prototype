@@ -17,10 +17,11 @@ class SamplePathController extends Controller
         $entryLevel = $request->input('entry_level', '10+');
         $entryLevels = ['10+', '12+', 'Lateral'];
 
-        // Load courses (non-deleted, sorted by level then code)
+        // Load courses (non-deleted, filled only, sorted by level then code)
         $courses = $programme->courses()
             ->with('level')
             ->whereNull('deleted_at')
+            ->where('is_placeholder', false)
             ->orderBy('level_id')
             ->orderBy('course_code')
             ->get();

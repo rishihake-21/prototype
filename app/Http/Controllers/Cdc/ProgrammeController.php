@@ -46,7 +46,7 @@ class ProgrammeController extends Controller
 
         $programme = Programme::create($validated);
 
-        // Import from Selected Scheme
+        // Import levels from the selected scheme.
         $programme->load('scheme.levels');
         $schemeLevels = $programme->scheme->levels;
         
@@ -61,6 +61,17 @@ class ProgrammeController extends Controller
             ProgrammeStructure::create([
                 'programme_id' => $programme->id,
                 'level_id'     => $level->id,
+                'total_courses_offered' => 0,
+                'courses_to_complete'   => 0,
+                'compulsory_count'      => 0,
+                'elective_count'        => 0,
+                'audit_count'           => 0,
+                'th_hours'              => 0,
+                'tu_hours'              => 0,
+                'pr_hours'              => 0,
+                'total_hours'           => 0,
+                'total_credits'         => 0,
+                'total_marks'           => 0,
             ]);
         }
 
@@ -71,7 +82,13 @@ class ProgrammeController extends Controller
 
     public function show(Programme $programme)
     {
-        $programme->load(['levels.structure', 'creator']);
+        $programme->load([
+            'levels.structure',
+            'levels.courses' => function ($q) {
+                $q->whereNull('deleted_at');
+            },
+            'creator'
+        ]);
         return view('cdc.programmes.show', compact('programme'));
     }
 

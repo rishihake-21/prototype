@@ -141,8 +141,8 @@
 
             <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">Assessment Marks Breakdown</h3>
             @php
-                $schemeRows = $programme->scheme?->getHeaderRows() ?? [];
-                $leafCols   = $programme->scheme?->getLeafColumns() ?? [];
+                $schemeRows = $programme->scheme?->getAssessmentHeaderRows() ?? [];
+                $leafCols   = $programme->scheme?->getAssessmentLeafColumns() ?? [];
 
                 // Map existing assessments by component_id if editing
                 $existingMarks = [];
@@ -152,10 +152,10 @@
                 $marks = old('assessment_marks', $existingMarks);
             @endphp
             
-            @if(empty($schemeRows))
+            @if(empty($leafCols))
                 <div class="rounded-lg bg-orange-50 border border-orange-200 p-4 text-sm text-orange-700">
                     <p class="font-medium">No Assessment Columns Defined.</p>
-                    <p class="mt-1">Please edit the parent Scheme ({{ $programme->scheme?->name }}) to define assessment columns.</p>
+                    <p class="mt-1">Please edit the parent Scheme ({{ $programme->scheme?->name ?? 'Unassigned' }}) to define assessment columns.</p>
                 </div>
             @else
                 <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm mt-4 mb-6">
