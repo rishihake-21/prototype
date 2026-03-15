@@ -60,24 +60,37 @@ class SyllabusController extends Controller
 
     public function create(Request $request)
     {
+        if (auth()->user()->isFaculty() && !$request->filled('assignment')) {
+            return redirect()->route('dashboard.creator')
+                ->with('error', 'Start syllabus creation from an assigned course so the CDC and HOD workflow stays linked.');
+        }
+
         $assignmentId = $request->query('assignment');
         $assignment = null;
         
         if ($assignmentId) {
             $assignment = \App\Models\CourseAssignment::with(['course.programme', 'course.level', 'syllabi'])->find($assignmentId);
+
+            if (!$assignment) {
+                return redirect()->route('dashboard.creator')
+                    ->with('error', 'The selected assignment could not be found.');
+            }
             
             // Authorization: assignment must belong to current user
-            if ($assignment && $assignment->faculty_user_id !== auth()->id()) {
+            if ($assignment->faculty_user_id !== auth()->id()) {
                 abort(403, 'Unauthorized access to assignment.');
             }
 
+            if ($assignment->status === \App\Models\CourseAssignment::STATUS_COMPLETED) {
+                return redirect()->route('dashboard.creator')
+                    ->with('error', 'This assignment is already completed.');
+            }
+
             // If a draft/rejected copy already exists for this assignment, redirect to edit instead of showing create form
-            if ($assignment) {
-                $existing = $assignment->syllabi()->where('submitted_by', auth()->id())->first();
-                if ($existing && $existing->canBeEdited()) {
-                    return redirect()->route('syllabi.edit', $existing)
-                        ->with('info', 'You already have a draft for this assignment. Pick up where you left off.');
-                }
+            $existing = $assignment->syllabi()->where('submitted_by', auth()->id())->first();
+            if ($existing && $existing->canBeEdited()) {
+                return redirect()->route('syllabi.edit', $existing)
+                    ->with('info', 'You already have a draft for this assignment. Pick up where you left off.');
             }
         }
 
@@ -93,6 +106,23 @@ class SyllabusController extends Controller
 
     public function store(StoreSyllabusRequest $request)
     {
+        if (auth()->user()->isFaculty() && !$request->filled('assignment_id')) {
+            return redirect()->route('dashboard.creator')
+                ->with('error', 'Faculty syllabi must be created from an HOD assignment.');
+        }
+
+        if (auth()->user()->isFaculty()) {
+            $assignment = \App\Models\CourseAssignment::find($request->input('assignment_id'));
+            if (!$assignment || $assignment->faculty_user_id !== auth()->id()) {
+                abort(403, 'Unauthorized assignment.');
+            }
+
+            if ($assignment->status === \App\Models\CourseAssignment::STATUS_COMPLETED) {
+                return redirect()->route('dashboard.creator')
+                    ->with('error', 'This assignment is already completed.');
+            }
+        }
+
         $syllabus = $this->syllabusService->create($request->validated(), auth()->user());
 
         if ($request->input('status') === Syllabus::STATUS_SUBMITTED) {
@@ -213,6 +243,22 @@ class SyllabusController extends Controller
         }
     }
 
+    public function startReview(Syllabus $syllabus)
+    {
+        if (!auth()->user()->isApprover() && !auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        try {
+            $this->workflowService->startReview($syllabus, auth()->user());
+            return redirect()->route('syllabi.show', $syllabus)
+                ->with('success', 'Syllabus moved to under review.');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                ->with('error', $e->getMessage());
+        }
+    }
+
     public function approve(Request $request, Syllabus $syllabus)
     {
         if (!auth()->user()->isApprover() && !auth()->user()->isAdmin()) {
@@ -220,14 +266,28 @@ class SyllabusController extends Controller
         }
 
         $request->validate([
-            'action' => 'required|in:approve,request_changes',
-            'comments' => 'nullable|string|max:1000',
+            'action' => 'required|in:approve,request_changes,reject',
+            'comments' => 'nullable|string|max:2000',
         ]);
 
         try {
+            if ($syllabus->isSubmitted()) {
+                $this->workflowService->startReview($syllabus, auth()->user());
+                $syllabus->refresh();
+            }
+
             if ($request->action === 'approve') {
                 $this->workflowService->approve($syllabus, auth()->user(), $request->comments);
                 $message = 'Syllabus approved successfully.';
+            } elseif ($request->action === 'reject') {
+                $reason = trim((string) $request->comments);
+                if (mb_strlen($reason) < 20) {
+                    return redirect()->back()
+                        ->with('error', 'Rejection feedback must be at least 20 characters.');
+                }
+
+                $this->workflowService->reject($syllabus, auth()->user(), $reason);
+                $message = 'Syllabus rejected with feedback.';
             } else {
                 $this->workflowService->requestChanges($syllabus, auth()->user(), $request->comments ?: 'Please review and make necessary changes.');
                 $message = 'Changes requested successfully.';
@@ -298,7 +358,4 @@ class SyllabusController extends Controller
         return $this->docxService->download($syllabus);
     }
 }
-
-
-
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CourseAssignment;
 use App\Models\Syllabus;
 use App\Models\SyllabusReview;
 use App\Models\User;
@@ -31,12 +32,14 @@ class WorkflowService
         $syllabus->status = Syllabus::STATUS_SUBMITTED;
         $syllabus->submitted_at = Carbon::now();
         
-        if ($syllabus->isRejected() || $syllabus->isChangesRequested()) {
+        if (in_array($oldStatus, [Syllabus::STATUS_REJECTED, Syllabus::STATUS_CHANGES_REQUESTED], true)) {
             $syllabus->version_number++;
             $syllabus->rejection_reason = null;
         }
         
         $syllabus->save();
+
+        $this->syncAssignmentStatus($syllabus, CourseAssignment::STATUS_SUBMITTED);
         
         $this->auditService->log('syllabus.submitted', $syllabus, ['status' => $oldStatus], ['status' => $syllabus->status]);
         
@@ -68,6 +71,8 @@ class WorkflowService
         $oldStatus = $syllabus->status;
         $syllabus->status = Syllabus::STATUS_UNDER_REVIEW;
         $syllabus->save();
+
+        $this->syncAssignmentStatus($syllabus, CourseAssignment::STATUS_UNDER_REVIEW);
         
         $this->auditService->log('syllabus.under_review', $syllabus, ['status' => $oldStatus], ['status' => $syllabus->status]);
     }
@@ -97,9 +102,7 @@ class WorkflowService
         $this->auditService->log('syllabus.approved', $syllabus, ['status' => $oldStatus], ['status' => $syllabus->status]);
         
         // Update linked assignment status if exists
-        if ($syllabus->assignment_id) {
-            \App\Models\CourseAssignment::where('id', $syllabus->assignment_id)->update(['status' => 'completed']);
-        }
+        $this->syncAssignmentStatus($syllabus, CourseAssignment::STATUS_COMPLETED);
 
         // Create in-app notification
         Notification::create([
@@ -139,6 +142,8 @@ class WorkflowService
         ]);
         
         $this->auditService->log('syllabus.rejected', $syllabus, ['status' => $oldStatus], ['status' => $syllabus->status]);
+
+        $this->syncAssignmentStatus($syllabus, CourseAssignment::STATUS_REJECTED);
         
         // Create in-app notification
         Notification::create([
@@ -177,6 +182,8 @@ class WorkflowService
 
         $this->auditService->log('syllabus.changes_requested', $syllabus, ['status' => $oldStatus], ['status' => $syllabus->status]);
 
+        $this->syncAssignmentStatus($syllabus, CourseAssignment::STATUS_CHANGES_REQUESTED);
+
         // Create in-app notification
         Notification::create([
             'user_id' => $syllabus->creator->id,
@@ -198,5 +205,14 @@ class WorkflowService
         $syllabus->save();
         
         $this->auditService->log('syllabus.archived', $syllabus, ['status' => $oldStatus], ['status' => $syllabus->status]);
+    }
+
+    private function syncAssignmentStatus(Syllabus $syllabus, string $status): void
+    {
+        if (!$syllabus->assignment_id) {
+            return;
+        }
+
+        CourseAssignment::where('id', $syllabus->assignment_id)->update(['status' => $status]);
     }
 }

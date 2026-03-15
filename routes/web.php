@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('syllabi', SyllabusController::class);
     Route::post('syllabi/{syllabus}/submit', [SyllabusController::class, 'submit'])->name('syllabi.submit');
+    Route::patch('syllabi/{syllabus}/start-review', [SyllabusController::class, 'startReview'])->name('syllabi.start-review');
     Route::patch('syllabi/{syllabus}/approve', [SyllabusController::class, 'approve'])->name('syllabi.approve');
     Route::patch('syllabi/{syllabus}/reject', [SyllabusController::class, 'reject'])->name('syllabi.reject');
     Route::post('syllabi/{syllabus}/clone', [SyllabusController::class, 'clone'])->name('syllabi.clone');

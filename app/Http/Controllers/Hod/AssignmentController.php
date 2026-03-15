@@ -60,7 +60,7 @@ class AssignmentController extends Controller
         $currentYear = date('Y') . '-' . (date('y') + 1);
         $assignments = CourseAssignment::where('department_id', $department->id)
             ->where('academic_year', '>=', $currentYear) // Simple filter to hide old records
-            ->with(['course.programme', 'faculty', 'assigner'])
+            ->with(['course.programme', 'faculty', 'assigner', 'syllabi' => fn ($query) => $query->latest()])
             ->latest()
             ->get();
 
@@ -136,7 +136,7 @@ class AssignmentController extends Controller
             'assigned_by'     => $hod->id,
             'academic_year'   => $request->academic_year,
             'deadline'        => $request->deadline,
-            'status'          => 'pending',
+            'status'          => CourseAssignment::STATUS_PENDING,
             'assigned_at'     => now(),
         ]);
 
@@ -172,21 +172,22 @@ class AssignmentController extends Controller
              }
         }
 
+        $assignment->loadMissing('syllabi');
+
+        if ($assignment->syllabi->contains(fn ($syllabus) => !$syllabus->isDraft())) {
+            return back()->with('error', 'This assignment already has submitted or reviewed syllabus work. Keep the link intact and manage it through the review flow instead of revoking it.');
+        }
+
         // Prevent revoking if already completed (unless admin)
-        if ($assignment->status === 'completed' && !$hod->isAdmin()) {
+        if ($assignment->status === CourseAssignment::STATUS_COMPLETED && !$hod->isAdmin()) {
             return back()->with('error', 'Cannot revoke a completed assignment. The syllabus is already approved.');
         }
 
         DB::transaction(function() use ($assignment) {
-            // Delete associated syllabus if it's still in draft, rejected, or changes_requested mode
+            // Delete only draft-linked syllabi so the workflow trail is not broken.
             foreach ($assignment->syllabi as $syllabus) {
-                if ($syllabus->canBeEdited()) {
-                    // Only delete drafts/rejected. If it's already approved, we keep it (but we blocked this above anyway)
-                    $syllabus->forceDelete(); // Using forceDelete to truly remove it and avoid confusion
-                } else {
-                    // If it was submitted/under_review, we should probably null out the assignment_id
-                    // but since the assignment is gone, the faculty can't "finish" it through the workflow easily.
-                    $syllabus->update(['assignment_id' => null]);
+                if ($syllabus->isDraft()) {
+                    $syllabus->forceDelete();
                 }
             }
             

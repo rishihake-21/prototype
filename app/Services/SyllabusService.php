@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Course;
+use App\Models\CourseAssignment;
 use App\Models\Syllabus;
 use App\Models\User;
 
@@ -125,7 +126,7 @@ class SyllabusService
                 }
 
                 $data['course_id'] = $assignment->course_id;
-                $assignment->update(['status' => 'in_progress']);
+                $assignment->update(['status' => CourseAssignment::STATUS_IN_PROGRESS]);
             }
         }
 

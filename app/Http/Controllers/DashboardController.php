@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CourseAssignment;
 use App\Models\Syllabus;
 use Illuminate\Http\Request;
 
@@ -61,6 +62,13 @@ class DashboardController extends Controller
             'active_programmes' => \App\Models\Programme::where('status', 'active')->count(),
             'total_courses' => \App\Models\Course::count(),
             'unread_handoffs' => $user->notifications()->whereIn('type', $this->handoffTypes())->unread()->count(),
+            'active_assignments' => CourseAssignment::whereIn('status', CourseAssignment::activeStatuses())->count(),
+            'under_review' => CourseAssignment::where('status', CourseAssignment::STATUS_UNDER_REVIEW)->count(),
+            'changes_requested' => CourseAssignment::where('status', CourseAssignment::STATUS_CHANGES_REQUESTED)->count(),
+            'overdue_assignments' => CourseAssignment::whereIn('status', CourseAssignment::activeStatuses())
+                ->whereNotNull('deadline')
+                ->whereDate('deadline', '<', now()->toDateString())
+                ->count(),
         ];
 
         $recentProgrammes = \App\Models\Programme::with('creator')
@@ -74,7 +82,15 @@ class DashboardController extends Controller
             ->take(6)
             ->get();
 
-        return view('dashboard.cdc', compact('stats', 'recentProgrammes', 'handoffs'));
+        $workflowAssignments = CourseAssignment::whereIn('status', CourseAssignment::activeStatuses())
+            ->with(['course.programme', 'course.level', 'department', 'faculty', 'syllabi' => fn ($query) => $query->latest()])
+            ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('deadline')
+            ->latest('updated_at')
+            ->take(10)
+            ->get();
+
+        return view('dashboard.cdc', compact('stats', 'recentProgrammes', 'handoffs', 'workflowAssignments'));
     }
 
     public function creator()
@@ -87,11 +103,22 @@ class DashboardController extends Controller
             'pending' => $user->syllabiCreated()->byStatus(Syllabus::STATUS_SUBMITTED)->count(),
             'approved' => $user->syllabiCreated()->byStatus(Syllabus::STATUS_APPROVED)->count(),
             'rejected' => $user->syllabiCreated()->byStatus(Syllabus::STATUS_REJECTED)->count(),
+            'active_assignments' => CourseAssignment::where('faculty_user_id', $user->id)
+                ->whereIn('status', CourseAssignment::activeStatuses())
+                ->count(),
+            'overdue_assignments' => CourseAssignment::where('faculty_user_id', $user->id)
+                ->whereIn('status', CourseAssignment::activeStatuses())
+                ->whereNotNull('deadline')
+                ->whereDate('deadline', '<', now()->toDateString())
+                ->count(),
         ];
 
-        $assignments = \App\Models\CourseAssignment::where('faculty_user_id', $user->id)
-            ->where('status', 'pending')
-            ->with(['course.programme', 'course.level', 'assigner'])
+        $assignments = CourseAssignment::where('faculty_user_id', $user->id)
+            ->whereIn('status', CourseAssignment::activeStatuses())
+            ->with(['course.programme', 'course.level', 'assigner', 'syllabi' => fn ($query) => $query->latest()])
+            ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('deadline')
+            ->latest('updated_at')
             ->get();
 
         $recentSyllabi = $user->syllabiCreated()

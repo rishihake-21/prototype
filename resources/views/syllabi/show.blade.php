@@ -18,6 +18,16 @@
                     </a>
                 @endif
 
+                @if(auth()->user()->isApprover() && $syllabus->isSubmitted())
+                    <form action="{{ route('syllabi.start-review', $syllabus) }}" method="POST">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                            Start Review
+                        </button>
+                    </form>
+                @endif
+
                 @if(auth()->user()->isApprover() && $syllabus->canBeApprovedOrRejected())
                     <button onclick="showReviewModal()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
                         Review Syllabus
@@ -176,10 +186,11 @@
                     <select name="action" id="reviewAction" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" onchange="toggleComments()">
                         <option value="approve">Approve</option>
                         <option value="request_changes">Request Changes</option>
+                        <option value="reject">Reject</option>
                     </select>
                 </div>
                 <div class="mb-4" id="commentsSection" style="display: none;">
-                    <label class="block text-sm font-medium text-gray-700">Comments</label>
+                    <label class="block text-sm font-medium text-gray-700" id="commentsLabel">Comments</label>
                     <textarea name="comments" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Please provide feedback for the creator..."></textarea>
                 </div>
                 <div class="flex justify-end space-x-3">
@@ -207,8 +218,10 @@ function hideReviewModal() {
 function toggleComments() {
     const action = document.getElementById('reviewAction').value;
     const commentsSection = document.getElementById('commentsSection');
-    if (action === 'request_changes') {
+    const commentsLabel = document.getElementById('commentsLabel');
+    if (action === 'request_changes' || action === 'reject') {
         commentsSection.style.display = 'block';
+        commentsLabel.textContent = action === 'reject' ? 'Rejection Reason' : 'Comments';
     } else {
         commentsSection.style.display = 'none';
     }
