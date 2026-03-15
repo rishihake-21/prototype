@@ -18,6 +18,7 @@ class ProgrammeStructure extends Model
         'total_courses_offered',
         'courses_to_complete',
         'compulsory_count',
+        'elective_offered_count',
         'elective_count',
         'th_hours',
         'tu_hours',

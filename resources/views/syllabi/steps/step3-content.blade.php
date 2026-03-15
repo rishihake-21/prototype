@@ -23,13 +23,21 @@
             placeholder="Explain the importance and need for this course..."></textarea>
     </div>
 
+    <div>
+        <label class="block text-sm font-medium text-gray-700">Industry / Employer Expected Outcome</label>
+        <p class="text-xs text-gray-500 mb-1">State the main outcome industry expects from a student completing this course.</p>
+        <textarea x-model="form.industry_employer_outcome" @input="updatePreview()" rows="3" maxlength="2000"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            placeholder="Example: Develop web based applications using server side scripting with PHP."></textarea>
+    </div>
+
     <!-- Course Objectives -->
     <div>
         <div class="flex justify-between items-center mb-2">
-            <label class="block text-sm font-medium text-gray-700">Course Objectives</label>
+            <label class="block text-sm font-medium text-gray-700">Course Objectives (Optional)</label>
             <button type="button" @click="addObjective()" class="text-sm text-indigo-600 hover:text-indigo-800">+ Add Objective</button>
         </div>
-        <p class="text-xs text-gray-500 mb-2">The student will be able to...</p>
+        <p class="text-xs text-gray-500 mb-2">Keep this only if your department wants internal planning notes beyond the sample syllabus format.</p>
         <template x-for="(objective, index) in form.course_objectives" :key="index">
             <div class="flex gap-2 mb-2">
                 <input type="text" x-model="form.course_objectives[index]" @input="updatePreview()" @keydown.enter.prevent

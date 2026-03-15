@@ -45,6 +45,12 @@ class DocxService
             $section->addText($this->clean($syllabus->rationale));
             $section->addTextBreak();
         }
+
+        if (!empty($syllabus->industry_employer_outcome)) {
+            $section->addText('Industry / Employer Expected Outcome', ['bold' => true, 'size' => 12]);
+            $section->addText($this->clean($syllabus->industry_employer_outcome));
+            $section->addTextBreak();
+        }
         
         // Course Objectives
         $objectives = $syllabus->course_objectives ?? [];
@@ -143,7 +149,8 @@ class DocxService
             $table->addRow();
             $table->addCell(1000)->addText('S.No', ['bold' => true]);
             $table->addCell(1000)->addText('Unit', ['bold' => true]);
-            $table->addCell(5000)->addText('Title', ['bold' => true]);
+            $table->addCell(2500)->addText('LLO', ['bold' => true]);
+            $table->addCell(3500)->addText('Practical Exercise', ['bold' => true]);
             $table->addCell(1000)->addText('Hrs', ['bold' => true]);
             $table->addCell(1000)->addText('CO', ['bold' => true]);
 
@@ -152,9 +159,22 @@ class DocxService
                 $m = ($task['is_mandatory'] ?? false) ? '*' : '';
                 $table->addCell(1000)->addText($this->clean($task['s_no'] . $m));
                 $table->addCell(1000)->addText($this->clean((string)($task['unit_no'] ?? '-')));
-                $table->addCell(5000)->addText($this->clean($task['title']));
+                $table->addCell(2500)->addText($this->clean($task['llo'] ?? ($task['co_code'] ?? '-')));
+                $table->addCell(3500)->addText($this->clean($task['title']));
                 $table->addCell(1000)->addText($this->clean((string)$task['hours']));
                 $table->addCell(1000)->addText($this->clean($task['co_code'] ?? '-'));
+            }
+            $section->addTextBreak();
+        }
+
+        $section->addText('Self Learning', ['bold' => true, 'size' => 12]);
+        $section->addText($this->clean($syllabus->self_learning ?: 'Not Applicable'));
+        $section->addTextBreak();
+
+        if (!empty($syllabus->special_instructional_strategies)) {
+            $section->addText('Special Instructional Strategies', ['bold' => true, 'size' => 12]);
+            foreach ($syllabus->special_instructional_strategies as $strategy) {
+                $section->addListItem($this->clean($strategy), 0);
             }
             $section->addTextBreak();
         }
@@ -173,6 +193,15 @@ class DocxService
             $section->addText('Software/Websites', ['bold' => true, 'size' => 12]);
             foreach ($syllabus->software_websites as $sw) {
                 $text = ($sw['name'] ?? '') . ($sw['url'] ? ' (' . $sw['url'] . ')' : '');
+                $section->addListItem($this->clean($text), 0);
+            }
+            $section->addTextBreak();
+        }
+
+        if (!empty($syllabus->equipment_list)) {
+            $section->addText('Major Equipment / Instruments', ['bold' => true, 'size' => 12]);
+            foreach ($syllabus->equipment_list as $equipment) {
+                $text = ($equipment['name'] ?? '') . ': ' . ($equipment['specifications'] ?? '');
                 $section->addListItem($this->clean($text), 0);
             }
             $section->addTextBreak();

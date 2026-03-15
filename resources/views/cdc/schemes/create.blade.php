@@ -2,6 +2,7 @@
 
 @section('content')
 @php
+    $currentYear = now()->year;
     $levelsJson = htmlspecialchars(json_encode($scheme?->levels ?: []), ENT_QUOTES, 'UTF-8');
 
     $toStructure = function ($nodes) {
@@ -75,8 +76,9 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Implemented Year</label>
-                    <input type="number" name="implemented_year" value="{{ old('implemented_year', $scheme?->implemented_year) }}" placeholder="2026"
+                    <input type="number" name="implemented_year" value="{{ old('implemented_year', $scheme?->implemented_year ?? $currentYear) }}" placeholder="{{ $currentYear }}" min="{{ $currentYear }}"
                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+                    <p class="mt-1 text-xs text-gray-500">Past-year schemes are not created in this system. Use {{ $currentYear }} or later.</p>
                 </div>
             </div>
 
@@ -332,4 +334,3 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
 </script>
 @endpush
 @endsection
-

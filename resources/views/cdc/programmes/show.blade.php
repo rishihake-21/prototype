@@ -8,8 +8,22 @@
            class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline">
             <- Back to Programmes
         </a>
-        <h1 class="mt-2 text-2xl font-bold text-gray-900">{{ $programme->name }}</h1>
-        <p class="text-sm text-gray-500">{{ $programme->code }} - {{ $programme->academic_year }}</p>
+        <div class="mt-2 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ $programme->name }}</h1>
+                <p class="text-sm text-gray-500">{{ $programme->code }} - {{ $programme->academic_year }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('cdc.programmes.booklet', $programme) }}"
+                   class="inline-flex items-center rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50">
+                    Booklet Preview
+                </a>
+                <a href="{{ route('cdc.programmes.booklet.download-pdf', $programme) }}"
+                   class="inline-flex items-center rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700">
+                    Download Booklet PDF
+                </a>
+            </div>
+        </div>
     </div>
 
     {{-- Quick navigation cards --}}
@@ -85,6 +99,8 @@
                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Level Name</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Courses Offered</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">To Complete</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Elective Offered</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Elective To Complete</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Total Credits</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Total Marks</th>
                 </tr>
@@ -97,6 +113,8 @@
                     <td class="px-4 py-3 text-gray-900">{{ $level->level_name }}</td>
                     <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_courses_offered ?? '-' }}</td>
                     <td class="px-4 py-3 text-right text-gray-700">{{ $s?->courses_to_complete ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->elective_offered_count ?? '-' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-700">{{ $s?->elective_count ?? '-' }}</td>
                     <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_credits ?? '-' }}</td>
                     <td class="px-4 py-3 text-right text-gray-700">{{ $s?->total_marks ?? '-' }}</td>
                 </tr>

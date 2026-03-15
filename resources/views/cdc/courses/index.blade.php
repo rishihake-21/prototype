@@ -50,19 +50,51 @@
     @endphp
 
     @if($courses->isEmpty())
-        <div class="bg-white rounded-xl shadow-sm ring-1 ring-gray-200 py-14 text-center">
-            <p class="text-sm text-gray-500">No courses found. Use "Add Course" to define courses for this programme.</p>
+        <div class="mb-6 bg-white rounded-xl shadow-sm ring-1 ring-gray-200 py-8 text-center">
+            <p class="text-sm text-gray-500">No courses have been defined yet. Use the level-wise pending slots below to start filling the programme.</p>
         </div>
-    @else
-        @foreach($programme->levels as $level)
-            @if(!$grouped->has($level->id)) @continue @endif
-            @php $levelCourses = $grouped[$level->id]; @endphp
+    @endif
+
+    @foreach($programme->levels as $level)
+            @php
+                $levelCourses = $grouped->get($level->id, collect());
+                $structure = $level->structure;
+                $offered = (int) ($structure?->total_courses_offered ?? $level->courses_limit ?? 0);
+                $defined = $levelCourses->count();
+                $remaining = max($offered - $defined, 0);
+                $compLimit = (int) ($structure?->compulsory_count ?? 0);
+                $elecLimit = (int) ($structure?->elective_offered_count ?? $structure?->elective_count ?? 0);
+                $elecToComplete = (int) ($structure?->elective_count ?? 0);
+                $compDefined = $levelCourses->where('course_type', 'compulsory')->count();
+                $elecDefined = $levelCourses->where('course_type', 'elective')->count();
+            @endphp
 
             <div class="mb-6">
                 <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-sm font-bold uppercase tracking-wide text-indigo-700">
-                        {{ $level->level_code }} - {{ $level->level_name }}
-                    </h2>
+                    <div>
+                        <h2 class="text-sm font-bold uppercase tracking-wide text-indigo-700">
+                            {{ $level->level_code }} - {{ $level->level_name }}
+                        </h2>
+                        <div class="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-600">
+                            <span class="rounded-full bg-indigo-50 px-2 py-0.5">Defined {{ $defined }} / {{ $offered }} offered</span>
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5">Remaining slots {{ $remaining }}</span>
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5">Compulsory {{ $compDefined }} / {{ $compLimit }}</span>
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5">Elective pool {{ $elecDefined }} / {{ $elecLimit }}</span>
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5">HOD to pick {{ $elecToComplete }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        @if($remaining > 0)
+                            <a href="{{ route('cdc.courses.create', [$programme, 'level_id' => $level->id]) }}"
+                               class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition">
+                                Add Course to {{ $level->level_code }}
+                            </a>
+                        @else
+                            <span class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+                                Level filled
+                            </span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl overflow-x-auto">
@@ -90,7 +122,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($levelCourses as $i => $course)
+                            @forelse($levelCourses as $i => $course)
                                 @php
                                     $marksByComponent = $course->assessments?->pluck('max_marks', 'component_id') ?? collect();
                                 @endphp
@@ -138,7 +170,13 @@
                                         </div>
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="{{ 13 + count($leafCols) }}" class="px-4 py-6 text-center text-sm text-gray-500">
+                                        No courses defined yet for {{ $level->level_code }}. Use the pending slots below to add them.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                         <tfoot>
                             <tr class="bg-indigo-50 text-xs font-semibold">
@@ -160,9 +198,20 @@
                         </tfoot>
                     </table>
                 </div>
+
+                @if($remaining > 0)
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        @for($slot = 0; $slot < $remaining; $slot++)
+                            <a href="{{ route('cdc.courses.create', [$programme, 'level_id' => $level->id]) }}"
+                               class="rounded-xl border border-dashed border-blue-300 bg-blue-50/60 px-4 py-3 text-sm text-blue-700 hover:bg-blue-100 transition">
+                                <div class="font-semibold">Pending course slot {{ $defined + $slot + 1 }}</div>
+                                <div class="mt-1 text-xs text-blue-600">Create a course for {{ $level->level_code }}.</div>
+                            </a>
+                        @endfor
+                    </div>
+                @endif
             </div>
-        @endforeach
-    @endif
+    @endforeach
 
     <div class="mt-4">{{ $courses->withQueryString()->links() }}</div>
 </div>

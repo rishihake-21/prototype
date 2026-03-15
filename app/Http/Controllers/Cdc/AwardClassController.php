@@ -8,6 +8,7 @@ use App\Models\Programme;
 use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AwardClassController extends Controller
 {
@@ -39,7 +40,13 @@ class AwardClassController extends Controller
     {
         $request->validate([
             'course_ids'   => 'nullable|array',
-            'course_ids.*' => 'exists:courses,id',
+            'course_ids.*' => [
+                'integer',
+                Rule::exists('courses', 'id')->where(function ($query) use ($programme) {
+                    $query->where('programme_id', $programme->id)
+                        ->whereNull('deleted_at');
+                }),
+            ],
         ]);
 
         $courseIds = $request->input('course_ids', []);

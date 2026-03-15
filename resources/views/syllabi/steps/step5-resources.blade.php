@@ -1,5 +1,34 @@
 <div class="space-y-6">
     <h3 class="text-lg font-medium text-gray-900">Step 5: Learning Resources</h3>
+
+    <div class="bg-gray-50 p-4 rounded-md">
+        <h4 class="font-medium text-gray-700">Self Learning</h4>
+        <p class="text-xs text-gray-500 mt-1">Assignment / activities for specific learning / skill development / online courses / micro projects.</p>
+        <textarea x-model="form.self_learning" @input="updatePreview()" rows="3"
+            class="mt-3 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+            placeholder="Example: Not Applicable"></textarea>
+    </div>
+
+    <div class="bg-gray-50 p-4 rounded-md">
+        <div class="flex justify-between items-center mb-3">
+            <h4 class="font-medium text-gray-700">Special Instructional Strategies</h4>
+            <button type="button" @click="addInstructionalStrategy()" class="text-sm text-indigo-600 hover:text-indigo-800">+ Add Strategy</button>
+        </div>
+
+        <template x-for="(strategy, index) in form.special_instructional_strategies" :key="index">
+            <div class="flex items-start gap-2 mb-2">
+                <span class="mt-2 text-sm font-medium text-gray-500" x-text="(index + 1) + '.'"></span>
+                <input type="text" x-model="form.special_instructional_strategies[index]" @input="updatePreview()" @keydown.enter.prevent
+                    class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                    placeholder="Instructional strategy">
+                <button type="button" @click="removeInstructionalStrategy(index)" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
+            </div>
+        </template>
+
+        <div x-show="form.special_instructional_strategies.length === 0" class="text-center py-4 text-gray-500 text-sm">
+            No strategies added yet.
+        </div>
+    </div>
     
     <!-- Books -->
     <div class="bg-gray-50 p-4 rounded-md">

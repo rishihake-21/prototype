@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\CourseAssignment;
 use App\Models\Department;
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +78,26 @@ class AssignmentController extends Controller
 
         $hod = auth()->user();
         $department = $hod->headedDepartment ?: $hod->departments()->first();
+        $course = Course::with(['level.structure', 'programme'])->findOrFail($request->course_id);
+
+        $facultyAllowed = User::where('id', $request->faculty_user_id)
+            ->where('role', User::ROLE_FACULTY)
+            ->whereHas('departments', fn ($q) => $q->where('departments.id', $department->id))
+            ->exists();
+
+        if (!$facultyAllowed) {
+            return back()->with('error', 'Selected faculty member does not belong to your department.');
+        }
+
+        $directForDepartment = (int) $course->programme->department_id === (int) $department->id;
+        $mappedToDepartment = DB::table('course_programme_departments')
+            ->where('course_id', $course->id)
+            ->where('department_id', $department->id)
+            ->exists();
+
+        if (!$directForDepartment && !$mappedToDepartment) {
+            return back()->with('error', 'This course is not available for your department.');
+        }
 
         // Check if already assigned for this year
         $exists = CourseAssignment::where([
@@ -89,6 +110,25 @@ class AssignmentController extends Controller
             return back()->with('error', 'This course is already assigned to someone for the selected academic year.');
         }
 
+        if ($course->course_type === Course::TYPE_ELECTIVE) {
+            $electiveToComplete = (int) ($course->level?->structure?->elective_count ?? 0);
+            if ($electiveToComplete <= 0) {
+                return back()->with('error', 'No elective selections are configured for this level.');
+            }
+
+            $selectedElectives = CourseAssignment::where('department_id', $department->id)
+                ->where('academic_year', $request->academic_year)
+                ->whereHas('course', function ($q) use ($course) {
+                    $q->where('level_id', $course->level_id)
+                        ->where('course_type', Course::TYPE_ELECTIVE);
+                })
+                ->count();
+
+            if ($selectedElectives >= $electiveToComplete) {
+                return back()->with('error', "Only {$electiveToComplete} elective course(s) can be taken forward for {$course->level->level_code}.");
+            }
+        }
+
         CourseAssignment::create([
             'course_id'       => $request->course_id,
             'department_id'   => $department->id,
@@ -99,6 +139,24 @@ class AssignmentController extends Controller
             'status'          => 'pending',
             'assigned_at'     => now(),
         ]);
+
+        if ($course->course_type === Course::TYPE_ELECTIVE) {
+            $cdcs = User::where('role', User::ROLE_CDC)->get();
+            foreach ($cdcs as $cdc) {
+                Notification::create([
+                    'user_id' => $cdc->id,
+                    'type' => Notification::TYPE_ELECTIVE_SELECTED,
+                    'title' => 'HOD Selected an Elective',
+                    'message' => "{$department->name} selected {$course->course_code} - {$course->course_title} for {$request->academic_year}. This elective now moves forward in the cycle.",
+                    'data' => [
+                        'programme_id' => $course->programme_id,
+                        'course_id' => $course->id,
+                        'department_id' => $department->id,
+                        'academic_year' => $request->academic_year,
+                    ],
+                ]);
+            }
+        }
 
         return back()->with('success', 'Course assigned successfully.');
     }

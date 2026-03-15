@@ -37,7 +37,8 @@ class ProgrammeStructureController extends Controller
             $offered    = (int) ($data['total_courses_offered'] ?? 0);
             $toComplete = (int) ($data['courses_to_complete']   ?? 0);
             $compulsory = (int) ($data['compulsory_count']      ?? 0);
-            $elective   = (int) ($data['elective_count']        ?? 0);
+            $electiveOffered = (int) ($data['elective_offered_count'] ?? 0);
+            $electiveToComplete = (int) ($data['elective_count'] ?? 0);
             $th         = (int) ($data['th_hours']              ?? 0);
             $tu         = (int) ($data['tu_hours']              ?? 0);
             $pr         = (int) ($data['pr_hours']              ?? 0);
@@ -46,6 +47,21 @@ class ProgrammeStructureController extends Controller
 
             if ($toComplete > $offered) {
                 $errors[] = "Level {$level->level_code}: 'Courses to Complete' ({$toComplete}) cannot exceed 'Total Courses Offered' ({$offered}).";
+                continue;
+            }
+
+            if ($compulsory + $electiveOffered > $offered) {
+                $errors[] = "Level {$level->level_code}: compulsory courses plus elective courses offered cannot exceed total courses offered.";
+                continue;
+            }
+
+            if ($electiveToComplete > $electiveOffered) {
+                $errors[] = "Level {$level->level_code}: elective courses to complete cannot exceed elective courses offered.";
+                continue;
+            }
+
+            if ($compulsory + $electiveToComplete > $toComplete) {
+                $errors[] = "Level {$level->level_code}: compulsory courses plus elective courses to complete cannot exceed courses to complete.";
                 continue;
             }
 
@@ -68,7 +84,8 @@ class ProgrammeStructureController extends Controller
                     'total_courses_offered' => $offered,
                     'courses_to_complete'   => $toComplete,
                     'compulsory_count'      => $compulsory,
-                    'elective_count'        => $elective,
+                    'elective_offered_count'=> $electiveOffered,
+                    'elective_count'        => $electiveToComplete,
                     'th_hours'              => $th,
                     'tu_hours'              => $tu,
                     'pr_hours'              => $pr,
@@ -91,25 +108,4 @@ class ProgrammeStructureController extends Controller
             ->with('success', 'Master Curriculum structure saved. You can now define courses for each level.');
     }
 
-    /**
-     * Re-calculate structure totals from courses and return JSON.
-     * Used by the "Calculate from Courses" button.
-     */
-    public function calculate(Programme $programme)
-    {
-        $programme->load(['levels.structure']);
-
-        $result = [];
-
-        foreach ($programme->levels as $level) {
-            $struct = $level->structure ?? new ProgrammeStructure([
-                'programme_id' => $programme->id,
-                'level_id'     => $level->id,
-            ]);
-
-            $result[$level->id] = $struct->calculateFromCourses();
-        }
-
-        return response()->json($result);
-    }
 }

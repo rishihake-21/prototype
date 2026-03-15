@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Programme;
 use App\Models\SamplePath;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SamplePathController extends Controller
 {
@@ -48,7 +49,13 @@ class SamplePathController extends Controller
             'entry_level' => 'required|string|max:20',
             'terms'       => 'nullable|array',
             'terms.*'     => 'array',
-            'terms.*.*'   => 'exists:courses,id',
+            'terms.*.*'   => [
+                'integer',
+                Rule::exists('courses', 'id')->where(function ($query) use ($programme) {
+                    $query->where('programme_id', $programme->id)
+                        ->whereNull('deleted_at');
+                }),
+            ],
         ]);
 
         $entryLevel = $request->input('entry_level');

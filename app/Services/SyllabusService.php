@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Course;
 use App\Models\Syllabus;
 use App\Models\User;
 
@@ -98,11 +99,17 @@ class SyllabusService
             $data['policies'] = '';
         }
 
-        // Metadata explicitly so we don't rely on mass-assignment for system fields
-        $syllabus = new Syllabus($data);
-        $syllabus->submitted_by = $creator->id;
-        $syllabus->status = Syllabus::STATUS_DRAFT;
-        $syllabus->version_number = 1;
+        if (!array_key_exists('industry_employer_outcome', $data) || $data['industry_employer_outcome'] === null) {
+            $data['industry_employer_outcome'] = '';
+        }
+
+        if (!array_key_exists('self_learning', $data) || $data['self_learning'] === null) {
+            $data['self_learning'] = 'Not Applicable';
+        }
+
+        if (!array_key_exists('special_instructional_strategies', $data) || $data['special_instructional_strategies'] === null) {
+            $data['special_instructional_strategies'] = [];
+        }
 
         // If starting from an assignment, sync metadata and prevent duplicates
         if (!empty($data['assignment_id'])) {
@@ -121,6 +128,14 @@ class SyllabusService
                 $assignment->update(['status' => 'in_progress']);
             }
         }
+
+        [$data, $departmentIds] = $this->syncLockedCourseDefinition($data, $departmentIds);
+
+        // Metadata explicitly so we don't rely on mass-assignment for system fields
+        $syllabus = new Syllabus($data);
+        $syllabus->submitted_by = $creator->id;
+        $syllabus->status = Syllabus::STATUS_DRAFT;
+        $syllabus->version_number = 1;
 
         $syllabus->save();
 
@@ -198,6 +213,20 @@ class SyllabusService
         if (!array_key_exists('policies', $data) || $data['policies'] === null) {
             $data['policies'] = $syllabus->policies ?? '';
         }
+
+        if (!array_key_exists('industry_employer_outcome', $data) || $data['industry_employer_outcome'] === null) {
+            $data['industry_employer_outcome'] = $syllabus->industry_employer_outcome ?? '';
+        }
+
+        if (!array_key_exists('self_learning', $data) || $data['self_learning'] === null) {
+            $data['self_learning'] = $syllabus->self_learning ?? 'Not Applicable';
+        }
+
+        if (!array_key_exists('special_instructional_strategies', $data) || $data['special_instructional_strategies'] === null) {
+            $data['special_instructional_strategies'] = $syllabus->special_instructional_strategies ?? [];
+        }
+
+        [$data, $departmentIds] = $this->syncLockedCourseDefinition($data, $departmentIds);
 
         $syllabus->fill($data);
         $syllabus->save();
@@ -287,5 +316,136 @@ class SyllabusService
         }
 
         return false;
+    }
+
+    /**
+     * Keep syllabus identity and scheme fields aligned with the linked CDC course definition.
+     *
+     * @param array<string, mixed> $data
+     * @param array<int, mixed>|null $departmentIds
+     * @return array{0: array<string, mixed>, 1: array<int, mixed>|null}
+     */
+    private function syncLockedCourseDefinition(array $data, ?array $departmentIds): array
+    {
+        $courseId = $data['course_id'] ?? null;
+        if (!$courseId) {
+            return [$data, $departmentIds];
+        }
+
+        $course = Course::with(['programme', 'level', 'departments', 'assessments.component'])->find($courseId);
+        if (!$course) {
+            return [$data, $departmentIds];
+        }
+
+        $assessment = $this->mapCourseAssessmentToSyllabusScheme($course);
+        $existingTeaching = is_array($data['teaching_scheme'] ?? null) ? $data['teaching_scheme'] : [];
+        $existingExam = is_array($data['examination_scheme'] ?? null) ? $data['examination_scheme'] : [];
+
+        $data['course_id'] = $course->id;
+        $data['title'] = $course->course_title;
+        $data['course_code'] = $course->course_code;
+        $data['program_name'] = $course->programme?->code ?? ($data['program_name'] ?? '');
+        $data['academic_year'] = $course->programme?->academic_year ?? ($data['academic_year'] ?? '');
+        $data['scheme_type'] = $course->programme?->scheme_type ?? ($data['scheme_type'] ?? 'standard');
+        $data['level'] = $course->level?->sort_order ?? ($data['level'] ?? null);
+        $data['elective_group'] = $course->course_type === Course::TYPE_ELECTIVE
+            ? ($course->elective_group ?? null)
+            : null;
+
+        $data['teaching_scheme'] = array_merge($existingTeaching, [
+            'th_hours' => (int) $course->th_hours,
+            'tu_hours' => (int) $course->tu_hours,
+            'pr_hours' => (int) $course->pr_hours,
+            'credits' => (float) $course->credits,
+            'total_hours' => (int) $course->total_hours,
+            'slh_hours' => (int) ($existingTeaching['slh_hours'] ?? 0),
+            'nlh_hours' => (int) $course->total_hours + (int) ($existingTeaching['slh_hours'] ?? 0),
+        ]);
+
+        $data['examination_scheme'] = array_merge($existingExam, [
+            'fa_th_max' => $assessment['fa_th_max'],
+            'fa_th_min' => $assessment['fa_th_min'],
+            'sa_th_max' => $assessment['sa_th_max'],
+            'sa_th_min' => $assessment['sa_th_min'],
+            'sa_pr_max' => $assessment['sa_pr_max'],
+            'sa_pr_min' => $assessment['sa_pr_min'],
+            'tw_marks' => $assessment['tw_marks'],
+            'paper_duration' => $course->theory_paper_hrs,
+        ]);
+
+        $ownedDepartmentId = $course->programme?->department_id;
+        $mappedDepartmentIds = $course->departments->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $resolvedDepartmentIds = collect($mappedDepartmentIds)
+            ->merge($ownedDepartmentId ? [(int) $ownedDepartmentId] : [])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($resolvedDepartmentIds)) {
+            $departmentIds = $resolvedDepartmentIds;
+        }
+
+        return [$data, $departmentIds];
+    }
+
+    /**
+     * @return array<string, int|null>
+     */
+    private function mapCourseAssessmentToSyllabusScheme(Course $course): array
+    {
+        $out = [
+            'fa_th_max' => null,
+            'fa_th_min' => null,
+            'sa_th_max' => null,
+            'sa_th_min' => null,
+            'sa_pr_max' => null,
+            'sa_pr_min' => null,
+            'tw_marks' => null,
+        ];
+
+        foreach ($course->assessments as $assessment) {
+            $name = strtolower(trim((string) ($assessment->component?->component_name ?? '')));
+            $max = is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null;
+            $min = is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null;
+
+            if (($out['fa_th_max'] === null) && str_contains($name, 'fa-th') && str_contains($name, 'max')) {
+                $out['fa_th_max'] = $max;
+                continue;
+            }
+            if (($out['fa_th_min'] === null) && str_contains($name, 'fa-th') && str_contains($name, 'min')) {
+                $out['fa_th_min'] = $min ?? $max;
+                continue;
+            }
+            if (($out['sa_th_max'] === null) && str_contains($name, 'sa-th') && str_contains($name, 'max')) {
+                $out['sa_th_max'] = $max;
+                continue;
+            }
+            if (($out['sa_th_min'] === null) && str_contains($name, 'sa-th') && str_contains($name, 'min')) {
+                $out['sa_th_min'] = $min ?? $max;
+                continue;
+            }
+            if (($out['sa_pr_max'] === null) && str_contains($name, 'sa-pr') && str_contains($name, 'max')) {
+                $out['sa_pr_max'] = $max;
+                continue;
+            }
+            if (($out['sa_pr_min'] === null) && str_contains($name, 'sa-pr') && str_contains($name, 'min')) {
+                $out['sa_pr_min'] = $min ?? $max;
+                continue;
+            }
+            if (($out['tw_marks'] === null) && (str_contains($name, 'tw') || str_contains($name, 'sla')) && str_contains($name, 'max')) {
+                $out['tw_marks'] = $max;
+            }
+        }
+
+        $out['fa_th_max'] ??= 0;
+        $out['fa_th_min'] ??= 0;
+        $out['sa_th_max'] ??= 0;
+        $out['sa_th_min'] ??= 0;
+        $out['sa_pr_max'] ??= 0;
+        $out['sa_pr_min'] ??= 0;
+        $out['tw_marks'] ??= 0;
+
+        return $out;
     }
 }

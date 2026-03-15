@@ -16,6 +16,7 @@ trait SyllabusValidationRules
         
         return [
             'assignment_id' => 'nullable|exists:course_assignments,id',
+            'course_id' => 'nullable|exists:courses,id',
             'scheme_type' => 'nullable|string',
             'title' => $required . '|string|max:255',
             'status' => 'nullable|in:draft,submitted',
@@ -51,9 +52,10 @@ trait SyllabusValidationRules
             'is_part_of_group' => 'boolean',
             
             'rationale' => $required . '|string|max:2000',
-            'course_objectives' => $required . '|array|min:1',
+            'industry_employer_outcome' => $required . '|string|max:2000',
+            'course_objectives' => 'nullable|array',
             'course_objectives.*' => 'required|string',
-            'course_outcomes' => $required . '|array|min:1',
+            'course_outcomes' => $required . '|array|min:3',
             'course_outcomes.*.code' => 'required|string',
             'course_outcomes.*.description' => 'required|string',
             
@@ -80,7 +82,7 @@ trait SyllabusValidationRules
             'books' => 'nullable|array',
             'books.*.title' => 'required|string',
             'books.*.author' => 'required|string',
-            'books.*.publisher' => 'required|string',
+            'books.*.publication' => 'required|string',
             
             'software_websites' => 'nullable|array',
             'software_websites.*.name' => 'required|string',
@@ -88,7 +90,11 @@ trait SyllabusValidationRules
             
             'equipment_list' => 'nullable|array',
             'equipment_list.*.name' => 'required|string',
-            'equipment_list.*.specification' => 'required|string',
+            'equipment_list.*.specifications' => 'required|string',
+
+            'self_learning' => 'nullable|string|max:4000',
+            'special_instructional_strategies' => 'nullable|array',
+            'special_instructional_strategies.*' => 'required|string',
             
             'mapping_matrix' => 'nullable|array',
             'question_paper_profile' => 'nullable|array',
@@ -101,7 +107,6 @@ trait SyllabusValidationRules
     {
         return [
             'course_outcomes.min' => 'At least 3 Course Outcomes are required for final submission.',
-            'course_objectives.min' => 'At least 1 Course Objective is required.',
             'department_ids.min' => 'Please select at least one department.',
         ];
     }

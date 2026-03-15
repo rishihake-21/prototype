@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $levelStats = $levelStats ?? [];
+    $selectedLevelId = old('level_id', $selectedLevelId ?? $course?->level_id);
+@endphp
 <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6"
      x-data="courseForm()" x-init="init()">
 
@@ -16,6 +20,11 @@
     <h1 class="text-2xl font-bold text-gray-900 mb-6">
         {{ $course ? 'Edit Course' : 'Add Course' }} - {{ $programme->name }}
     </h1>
+
+    <div class="mb-5 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4">
+        <div class="text-sm font-semibold text-indigo-900">Course Definition is now driven by Scheme at a Glance</div>
+        <p class="mt-1 text-sm text-indigo-800">Select a level and define courses only within the offered slots configured for that level.</p>
+    </div>
 
     @if($errors->any())
     <div class="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -42,11 +51,11 @@
                 {{-- Level --}}
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Level <span class="text-red-500">*</span></label>
-                    <select name="level_id" required
+                    <select name="level_id" required x-model="selectedLevel"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         @foreach($programme->levels as $lv)
                             <option value="{{ $lv->id }}"
-                                {{ old('level_id', $course?->level_id) == $lv->id ? 'selected' : '' }}>
+                                {{ $selectedLevelId == $lv->id ? 'selected' : '' }}>
                                 {{ $lv->level_code }} - {{ $lv->level_name }}
                             </option>
                         @endforeach
@@ -88,6 +97,42 @@
                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('course_title') border-red-400 @enderror">
                 @error('course_title')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div class="rounded-lg bg-gray-50 px-3 py-2">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Offered</div>
+                    <div class="text-lg font-semibold text-gray-900" x-text="selectedStats.offered ?? 0"></div>
+                </div>
+                <div class="rounded-lg bg-gray-50 px-3 py-2">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Already Defined</div>
+                    <div class="text-lg font-semibold text-gray-900" x-text="selectedStats.defined ?? 0"></div>
+                </div>
+                <div class="rounded-lg bg-gray-50 px-3 py-2">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Remaining Slots</div>
+                    <div class="text-lg font-semibold text-indigo-700" x-text="selectedStats.remaining ?? 0"></div>
+                </div>
+                <div class="rounded-lg bg-gray-50 px-3 py-2">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Course Mix</div>
+                    <div class="text-sm font-semibold text-gray-900">
+                        <span x-text="`Comp ${selectedStats.compulsory_defined ?? 0}/${selectedStats.compulsory_limit ?? 0}`"></span>
+                        <span class="mx-1 text-gray-300">|</span>
+                        <span x-text="`Elec Pool ${selectedStats.elective_defined ?? 0}/${selectedStats.elective_offered_limit ?? selectedStats.elective_limit ?? 0}`"></span>
+                    </div>
+                    <div class="mt-1 text-[11px] text-gray-500" x-text="`HOD will pick ${selectedStats.elective_to_complete_limit ?? 0}`"></div>
+                </div>
+            </div>
+
+            <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs text-gray-700">
+                <div class="font-semibold text-gray-800">Level Limits</div>
+                <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <div x-text="`TH ${selectedStats.th_used ?? 0} / ${selectedStats.th_limit ?? 0}`"></div>
+                    <div x-text="`TU ${selectedStats.tu_used ?? 0} / ${selectedStats.tu_limit ?? 0}`"></div>
+                    <div x-text="`PR ${selectedStats.pr_used ?? 0} / ${selectedStats.pr_limit ?? 0}`"></div>
+                    <div x-text="`Hours ${selectedStats.hours_used ?? 0} / ${selectedStats.hours_limit ?? 0}`"></div>
+                    <div x-text="`Credits ${selectedStats.credits_used ?? 0} / ${selectedStats.credits_limit ?? 0}`"></div>
+                    <div x-text="`Marks ${selectedStats.marks_used ?? 0} / ${selectedStats.marks_limit ?? 0}`"></div>
+                </div>
+            </div>
         </div>
 
         {{-- Section: Teaching Scheme --}}
@@ -126,6 +171,7 @@
                 </div>
             </div>
             <p class="mt-2 text-xs text-gray-400">TH - Theory, TU - Tutorial, PR - Practical. Total Hours is auto-calculated.</p>
+            <p class="mt-1 text-xs text-gray-500">Validation also checks the level totals saved in Scheme at a Glance.</p>
         </div>
 
         {{-- Section: Examination Scheme --}}
@@ -189,6 +235,7 @@
                 </div>
 
                 <p class="mt-2 text-xs text-gray-400 text-right">Total marks are calculated automatically from the max-mark leaf values.</p>
+                <p class="mt-1 text-xs text-gray-500 text-right">The course will be blocked if this pushes the level above its total marks limit.</p>
             @endif
         </div>
 
@@ -278,8 +325,13 @@ function courseForm() {
         tu: {{ old('tu_hours', $course?->tu_hours ?? 0) }},
         pr: {{ old('pr_hours', $course?->pr_hours ?? 0) }},
         marks: @json($marks ?? []),
+        levelStats: @json($levelStats),
+        selectedLevel: '{{ $selectedLevelId }}',
         courseType: '{{ old('course_type', $course?->course_type ?? 'compulsory') }}',
         isCommon: {{ old('is_common_course', $course?->is_common_course ?? false) ? 'true' : 'false' }},
+        get selectedStats() {
+            return this.levelStats[this.selectedLevel] || {};
+        },
         get totalMarks() {
             return Object.values(this.marks).reduce((acc, val) => acc + (Number(val) || 0), 0);
         },
@@ -296,4 +348,3 @@ function courseForm() {
 </script>
 @endpush
 @endsection
-

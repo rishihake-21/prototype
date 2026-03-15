@@ -15,7 +15,10 @@
         <div class="lg:col-span-1">
             <div class="bg-white shadow sm:rounded-lg p-6 sticky top-8">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Assign New Subject</h3>
-                
+                <p class="mb-4 text-xs text-gray-500">
+                    Elective courses come here as a pool from CDC. Only the elective courses selected by HOD for the current academic year move forward in the syllabus cycle.
+                </p>
+                 
                 <form action="{{ route('hod.assignments.store') }}" method="POST" class="space-y-4">
                     @csrf
                     

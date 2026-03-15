@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Cdc;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Department;
+use App\Models\Notification;
 use App\Models\Programme;
 use App\Models\ProgrammeLevel;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -31,14 +33,24 @@ class CourseController extends Controller
 
         $courses = $query->orderBy('level_id')->orderBy('course_code')->paginate(30);
 
-        $programme->load('levels');
+        $programme->load(['levels' => function ($q) {
+            $q->with('structure')->orderBy('sort_order');
+        }]);
 
         return view('cdc.courses.index', compact('programme', 'courses'));
     }
 
-    public function create(Programme $programme)
+    public function create(Request $request, Programme $programme)
     {
-        $programme->load('levels', 'scheme.assessmentComponents');
+        $programme->load([
+            'levels' => function ($q) {
+                $q->with('structure')->orderBy('sort_order');
+            },
+            'scheme.assessmentComponents',
+        ]);
+
+        $selectedLevelId = old('level_id', $request->query('level_id', $programme->levels->first()?->id));
+        $levelStats = $this->buildLevelStats($programme);
 
         return view('cdc.courses.form', [
             'programme'    => $programme,
@@ -49,12 +61,18 @@ class CourseController extends Controller
             'schemeRows'   => $programme->scheme?->getCourseAssessmentHeaderRows() ?? [],
             'leafCols'     => $programme->scheme?->getCourseAssessmentLeafColumns() ?? [],
             'marks'        => old('assessment_marks', []),
+            'levelStats'   => $levelStats,
+            'selectedLevelId' => $selectedLevelId,
         ]);
     }
 
     public function store(Request $request, Programme $programme)
     {
         $data = $this->validateCourse($request, $programme);
+        $data['elective_group'] = ($data['course_type'] ?? null) === Course::TYPE_ELECTIVE
+            ? ($data['elective_group'] ?? null)
+            : null;
+        $this->validateLevelCapacity($programme, $data);
 
         if ($request->has('assessment_marks')) {
             $this->guardAssessmentKeys($programme, $request->input('assessment_marks', []));
@@ -83,6 +101,8 @@ class CourseController extends Controller
             $course->departments()->sync($request->input('departments'));
         }
 
+        $this->notifyHodsForElectivePool($course, 'created');
+
         return redirect()
             ->route('cdc.courses.index', $programme)
             ->with('success', "Course '{$course->course_code}' created successfully.");
@@ -91,7 +111,12 @@ class CourseController extends Controller
     public function edit(Programme $programme, Course $course)
     {
         $this->assertCourseInProgramme($programme, $course);
-        $programme->load('levels', 'scheme.assessmentComponents');
+        $programme->load([
+            'levels' => function ($q) {
+                $q->with('structure')->orderBy('sort_order');
+            },
+            'scheme.assessmentComponents',
+        ]);
         $course->load('departments', 'assessments');
 
         $existingMarks = $course->assessments->pluck('max_marks', 'component_id')->toArray();
@@ -105,6 +130,8 @@ class CourseController extends Controller
             'schemeRows'     => $programme->scheme?->getCourseAssessmentHeaderRows() ?? [],
             'leafCols'       => $programme->scheme?->getCourseAssessmentLeafColumns() ?? [],
             'marks'          => old('assessment_marks', $existingMarks),
+            'levelStats'     => $this->buildLevelStats($programme, $course),
+            'selectedLevelId' => old('level_id', $course->level_id),
         ]);
     }
 
@@ -112,6 +139,10 @@ class CourseController extends Controller
     {
         $this->assertCourseInProgramme($programme, $course);
         $data = $this->validateCourse($request, $programme, $course);
+        $data['elective_group'] = ($data['course_type'] ?? null) === Course::TYPE_ELECTIVE
+            ? ($data['elective_group'] ?? null)
+            : null;
+        $this->validateLevelCapacity($programme, $data, $course);
 
         if ($request->has('assessment_marks')) {
             $this->guardAssessmentKeys($programme, $request->input('assessment_marks', []));
@@ -143,6 +174,8 @@ class CourseController extends Controller
             $course->departments()->detach();
         }
 
+        $this->notifyHodsForElectivePool($course, 'updated');
+
         return redirect()
             ->route('cdc.courses.index', $programme)
             ->with('success', "Course '{$course->course_code}' updated successfully.");
@@ -151,8 +184,13 @@ class CourseController extends Controller
     public function destroy(Programme $programme, Course $course)
     {
         $this->assertCourseInProgramme($programme, $course);
+        $wasElective = $course->course_type === Course::TYPE_ELECTIVE;
         $code = $course->course_code;
         $course->delete();  // Soft delete
+
+        if ($wasElective) {
+            $this->notifyHodsForElectivePool($course, 'removed');
+        }
 
         return redirect()
             ->route('cdc.courses.index', $programme)
@@ -232,8 +270,11 @@ class CourseController extends Controller
             'term'               => 'nullable|in:odd,even',
             'is_award'           => 'boolean',
             'is_common_course'   => 'boolean',
-            'departments'        => 'nullable|array',
+            'departments'        => 'nullable|required_if:is_common_course,1|array|min:1',
             'departments.*'      => 'exists:departments,id',
+        ], [
+            'departments.required_if' => 'Select at least one department for a common course.',
+            'departments.min' => 'Select at least one department for a common course.',
         ]);
     }
 
@@ -263,6 +304,238 @@ class CourseController extends Controller
             ]);
         }
     }
+
+    /**
+     * @return array<int, array<string, int|string|null>>
+     */
+    private function buildLevelStats(Programme $programme, ?Course $ignore = null): array
+    {
+        $courses = Course::query()
+            ->where('programme_id', $programme->id)
+            ->whereNull('deleted_at')
+            ->when($ignore, fn ($q) => $q->where('id', '!=', $ignore->id))
+            ->get([
+                'id',
+                'level_id',
+                'course_type',
+                'th_hours',
+                'tu_hours',
+                'pr_hours',
+                'credits',
+                'total_marks',
+            ]);
+
+        $grouped = $courses->groupBy('level_id');
+        $stats = [];
+
+        foreach ($programme->levels as $level) {
+            $structure = $level->structure;
+            $rows = $grouped->get($level->id, collect());
+            $defined = $rows->count();
+            $compulsoryDefined = $rows->where('course_type', Course::TYPE_COMPULSORY)->count();
+            $electiveDefined = $rows->where('course_type', Course::TYPE_ELECTIVE)->count();
+            $offered = (int) ($structure?->total_courses_offered ?? $level->courses_limit ?? 0);
+            $compulsoryLimit = (int) ($structure?->compulsory_count ?? 0);
+            $electiveOfferedLimit = (int) ($structure?->elective_offered_count ?? $structure?->elective_count ?? 0);
+            $electiveToCompleteLimit = (int) ($structure?->elective_count ?? 0);
+            $thUsed = (int) $rows->sum('th_hours');
+            $tuUsed = (int) $rows->sum('tu_hours');
+            $prUsed = (int) $rows->sum('pr_hours');
+            $hoursUsed = $thUsed + $tuUsed + $prUsed;
+            $creditsUsed = (float) $rows->sum('credits');
+            $marksUsed = (int) $rows->sum('total_marks');
+
+            $stats[$level->id] = [
+                'offered' => $offered,
+                'defined' => $defined,
+                'remaining' => max($offered - $defined, 0),
+                'compulsory_limit' => $compulsoryLimit,
+                'compulsory_defined' => $compulsoryDefined,
+                'compulsory_remaining' => max($compulsoryLimit - $compulsoryDefined, 0),
+                'elective_limit' => $electiveOfferedLimit,
+                'elective_offered_limit' => $electiveOfferedLimit,
+                'elective_defined' => $electiveDefined,
+                'elective_remaining' => max($electiveOfferedLimit - $electiveDefined, 0),
+                'elective_to_complete_limit' => $electiveToCompleteLimit,
+                'th_limit' => (int) ($structure?->th_hours ?? $level->th_limit ?? 0),
+                'th_used' => $thUsed,
+                'tu_limit' => (int) ($structure?->tu_hours ?? $level->tu_limit ?? 0),
+                'tu_used' => $tuUsed,
+                'pr_limit' => (int) ($structure?->pr_hours ?? $level->pr_limit ?? 0),
+                'pr_used' => $prUsed,
+                'hours_limit' => (int) ($structure?->total_hours ?? $level->hours_limit ?? 0),
+                'hours_used' => $hoursUsed,
+                'credits_limit' => (float) ($structure?->total_credits ?? $level->credits_limit ?? 0),
+                'credits_used' => $creditsUsed,
+                'marks_limit' => (int) ($structure?->total_marks ?? $level->marks_limit ?? 0),
+                'marks_used' => $marksUsed,
+                'level_code' => $level->level_code,
+            ];
+        }
+
+        return $stats;
+    }
+
+    private function validateLevelCapacity(Programme $programme, array $data, ?Course $ignore = null): void
+    {
+        $level = $programme->levels()
+            ->with('structure')
+            ->findOrFail($data['level_id']);
+
+        $stats = $this->buildLevelStats($programme, $ignore)[$level->id] ?? null;
+        if (!$stats) {
+            return;
+        }
+
+        $errors = [];
+        $offered = (int) $stats['offered'];
+        $courseMarks = isset($data['assessment_marks']) && is_array($data['assessment_marks'])
+            ? $this->sumAssessmentMarks($data['assessment_marks'])
+            : 0;
+        $newTotalHours = (int) $data['th_hours'] + (int) $data['tu_hours'] + (int) $data['pr_hours'];
+
+        if ($offered <= 0) {
+            $errors['level_id'] = "No course slots are configured for {$level->level_code}. Update Scheme at a Glance first.";
+        } elseif ((int) $stats['defined'] >= $offered) {
+            $errors['level_id'] = "All {$offered} course slots for {$level->level_code} are already defined.";
+        }
+
+        if (($data['course_type'] ?? null) === Course::TYPE_COMPULSORY) {
+            $limit = (int) $stats['compulsory_limit'];
+            if ($limit > 0 && (int) $stats['compulsory_defined'] >= $limit) {
+                $errors['course_type'] = "Compulsory course limit reached for {$level->level_code}.";
+            }
+        }
+
+        if (($data['course_type'] ?? null) === Course::TYPE_ELECTIVE) {
+            $limit = (int) $stats['elective_limit'];
+            if ($limit > 0 && (int) $stats['elective_defined'] >= $limit) {
+                $errors['course_type'] = "Elective course limit reached for {$level->level_code}.";
+            }
+        }
+
+        if (($data['th_hours'] + $data['tu_hours'] + $data['pr_hours']) <= 0) {
+            $errors['th_hours'] = 'At least one of TH, TU, or PR must be greater than 0.';
+        }
+
+        $thLimit = (int) $stats['th_limit'];
+        if ($thLimit > 0 && ((int) $stats['th_used'] + (int) $data['th_hours']) > $thLimit) {
+            $errors['th_hours'] = "TH limit exceeded for {$level->level_code}. Allowed total is {$thLimit}.";
+        }
+
+        $tuLimit = (int) $stats['tu_limit'];
+        if ($tuLimit > 0 && ((int) $stats['tu_used'] + (int) $data['tu_hours']) > $tuLimit) {
+            $errors['tu_hours'] = "TU limit exceeded for {$level->level_code}. Allowed total is {$tuLimit}.";
+        }
+
+        $prLimit = (int) $stats['pr_limit'];
+        if ($prLimit > 0 && ((int) $stats['pr_used'] + (int) $data['pr_hours']) > $prLimit) {
+            $errors['pr_hours'] = "PR limit exceeded for {$level->level_code}. Allowed total is {$prLimit}.";
+        }
+
+        $hoursLimit = (int) $stats['hours_limit'];
+        if ($hoursLimit > 0 && ((int) $stats['hours_used'] + $newTotalHours) > $hoursLimit) {
+            $errors['th_hours'] = "Total hours limit exceeded for {$level->level_code}. Allowed total is {$hoursLimit}.";
+        }
+
+        $creditsLimit = (float) $stats['credits_limit'];
+        if ($creditsLimit > 0 && ((float) $stats['credits_used'] + (float) $data['credits']) > $creditsLimit) {
+            $errors['credits'] = "Credits limit exceeded for {$level->level_code}. Allowed total is {$creditsLimit}.";
+        }
+
+        $marksLimit = (int) $stats['marks_limit'];
+        if ($marksLimit > 0 && ((int) $stats['marks_used'] + $courseMarks) > $marksLimit) {
+            $errors['assessment_marks'] = "Total marks limit exceeded for {$level->level_code}. Allowed total is {$marksLimit}.";
+        }
+
+        if ((float) $data['credits'] > 0 && $newTotalHours === 0) {
+            $errors['credits'] = 'Credits cannot be greater than 0 when TH, TU, and PR are all 0.';
+        }
+
+        if (($data['course_type'] ?? null) === Course::TYPE_AUDIT) {
+            if ((float) $data['credits'] !== 0.0) {
+                $errors['credits'] = 'Audit courses must have 0 credits.';
+            }
+            if ($courseMarks > 0) {
+                $errors['assessment_marks'] = 'Audit courses should not have assessment marks.';
+            }
+        }
+
+        if (!empty($errors)) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * @param array<mixed> $assessmentMarks
+     */
+    private function sumAssessmentMarks(array $assessmentMarks): int
+    {
+        $total = 0;
+        foreach ($assessmentMarks as $marks) {
+            if ($marks === null || $marks === '') {
+                continue;
+            }
+
+            $total += (int) $marks;
+        }
+
+        return $total;
+    }
+
+    private function notifyHodsForElectivePool(Course $course, string $action): void
+    {
+        if ($course->course_type !== Course::TYPE_ELECTIVE) {
+            return;
+        }
+
+        $course->loadMissing(['programme.department', 'level.structure', 'departments']);
+
+        $departmentIds = collect([$course->programme?->department_id])
+            ->merge($course->departments->pluck('id'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($departmentIds)) {
+            return;
+        }
+
+        $hods = User::query()
+            ->where('role', User::ROLE_HOD)
+            ->whereHas('departments', function ($q) use ($departmentIds) {
+                $q->whereIn('departments.id', $departmentIds);
+            })
+            ->get();
+
+        if ($hods->isEmpty()) {
+            return;
+        }
+
+        $electiveToComplete = (int) ($course->level?->structure?->elective_count ?? 0);
+        $verb = match ($action) {
+            'created' => 'added to',
+            'removed' => 'removed from',
+            default => 'updated in',
+        };
+
+        foreach ($hods as $hod) {
+            Notification::create([
+                'user_id' => $hod->id,
+                'type' => Notification::TYPE_ELECTIVE_POOL_UPDATED,
+                'title' => 'Elective Pool Updated by CDC',
+                'message' => "Course {$course->course_code} was {$verb} the elective pool for {$course->programme->name} ({$course->level->level_code}). HOD can take forward up to {$electiveToComplete} elective(s).",
+                'data' => [
+                    'programme_id' => $course->programme_id,
+                    'course_id' => $course->id,
+                    'level_id' => $course->level_id,
+                    'action' => $action,
+                ],
+            ]);
+        }
+    }
+
     public function apiShow(Request $request, $code)
     {
         $query = Course::with(['programme', 'level', 'departments', 'assessments.component'])
@@ -303,8 +576,11 @@ class CourseController extends Controller
     {
         $out = [
             'test_max_marks' => null,   // FA-TH (Max)
+            'test_min_marks' => null,   // FA-TH (Min)
             'theory_max_marks' => null, // SA-TH (Max)
+            'theory_min_marks' => null, // SA-TH (Min)
             'pr_max_marks' => null,     // SA-PR (Max)
+            'pr_min_marks' => null,     // SA-PR (Min)
             'or_max_marks' => null,     // OR (Max)
             'tw_max_marks' => null,     // TW / SLA (Max)
         ];
@@ -320,12 +596,24 @@ class CourseController extends Controller
                 $out['test_max_marks'] = $max;
                 continue;
             }
+            if (($out['test_min_marks'] === null) && str_contains($name, 'fa-th') && str_contains($name, 'min')) {
+                $out['test_min_marks'] = is_numeric($a->min_marks) ? (int) $a->min_marks : $max;
+                continue;
+            }
             if (($out['theory_max_marks'] === null) && str_contains($name, 'sa-th') && str_contains($name, 'max')) {
                 $out['theory_max_marks'] = $max;
                 continue;
             }
+            if (($out['theory_min_marks'] === null) && str_contains($name, 'sa-th') && str_contains($name, 'min')) {
+                $out['theory_min_marks'] = is_numeric($a->min_marks) ? (int) $a->min_marks : $max;
+                continue;
+            }
             if (($out['pr_max_marks'] === null) && str_contains($name, 'sa-pr') && str_contains($name, 'max')) {
                 $out['pr_max_marks'] = $max;
+                continue;
+            }
+            if (($out['pr_min_marks'] === null) && str_contains($name, 'sa-pr') && str_contains($name, 'min')) {
+                $out['pr_min_marks'] = is_numeric($a->min_marks) ? (int) $a->min_marks : $max;
                 continue;
             }
             if (($out['or_max_marks'] === null) && (str_contains($name, 'or') || str_contains($name, 'oral')) && str_contains($name, 'max')) {

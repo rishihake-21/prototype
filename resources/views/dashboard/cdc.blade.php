@@ -8,7 +8,7 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl p-6 border border-gray-100 transition hover:shadow-md">
                     <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Programmes</div>
                     <div class="text-4xl font-black text-indigo-600">{{ $stats['total_programmes'] }}</div>
@@ -20,6 +20,10 @@
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl p-6 border border-gray-100 transition hover:shadow-md">
                     <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Courses Defined</div>
                     <div class="text-4xl font-black text-teal-600">{{ $stats['total_courses'] }}</div>
+                </div>
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-xl p-6 border border-gray-100 transition hover:shadow-md">
+                    <div class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Unread HOD Updates</div>
+                    <div class="text-4xl font-black text-amber-600">{{ $stats['unread_handoffs'] }}</div>
                 </div>
             </div>
 
@@ -76,6 +80,38 @@
                         </div>
                         <div class="px-6 py-3 bg-gray-50/30 border-t border-gray-50 text-right">
                             <a href="{{ route('cdc.programmes.index') }}" class="text-[10px] font-bold text-gray-400 hover:text-indigo-600 transition uppercase tracking-widest">View All Programmes →</a>
+                        </div>
+                    </div>
+
+                    <div class="bg-white shadow-sm sm:rounded-xl overflow-hidden border border-gray-100">
+                        <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                            <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wide">CDC ↔ HOD Handoffs</h3>
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Latest 6</span>
+                        </div>
+                        <div class="divide-y divide-gray-50">
+                            @forelse($handoffs as $note)
+                                <div class="px-6 py-4 {{ $note->is_read ? 'bg-white' : 'bg-amber-50/50' }}">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div class="text-sm font-bold text-gray-900">{{ $note->title }}</div>
+                                            <div class="mt-1 text-xs text-gray-600">{{ $note->message }}</div>
+                                        </div>
+                                        <div class="flex flex-col items-end gap-2">
+                                            @if(!$note->is_read)
+                                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">NEW</span>
+                                                <button type="button"
+                                                        onclick="fetch('{{ route('notifications.read', $note) }}', {method: 'POST', headers: {'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content}}).then(() => window.location.reload())"
+                                                        class="text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:text-indigo-800">
+                                                    Mark Read
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 text-[10px] uppercase tracking-widest text-gray-400">{{ $note->created_at->diffForHumans() }}</div>
+                                </div>
+                            @empty
+                                <div class="px-6 py-8 text-sm text-gray-500">No CDC/HOD handoff messages yet.</div>
+                            @endforelse
                         </div>
                     </div>
                 </div>

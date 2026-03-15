@@ -7,6 +7,17 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    /**
+     * @return array<int, string>
+     */
+    private function handoffTypes(): array
+    {
+        return [
+            \App\Models\Notification::TYPE_ELECTIVE_POOL_UPDATED,
+            \App\Models\Notification::TYPE_ELECTIVE_SELECTED,
+        ];
+    }
+
     public function index()
     {
         $user = auth()->user();
@@ -49,6 +60,7 @@ class DashboardController extends Controller
             'total_programmes' => \App\Models\Programme::count(),
             'active_programmes' => \App\Models\Programme::where('status', 'active')->count(),
             'total_courses' => \App\Models\Course::count(),
+            'unread_handoffs' => $user->notifications()->whereIn('type', $this->handoffTypes())->unread()->count(),
         ];
 
         $recentProgrammes = \App\Models\Programme::with('creator')
@@ -56,7 +68,13 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        return view('dashboard.cdc', compact('stats', 'recentProgrammes'));
+        $handoffs = $user->notifications()
+            ->whereIn('type', $this->handoffTypes())
+            ->latest()
+            ->take(6)
+            ->get();
+
+        return view('dashboard.cdc', compact('stats', 'recentProgrammes', 'handoffs'));
     }
 
     public function creator()
@@ -110,6 +128,7 @@ class DashboardController extends Controller
                 ->where('status', 'rejected')
                 ->whereMonth('review_date', now()->month)
                 ->count(),
+            'unread_handoffs' => $user->notifications()->whereIn('type', $this->handoffTypes())->unread()->count(),
         ];
 
         $reviewQueue = Syllabus::query()
@@ -119,6 +138,12 @@ class DashboardController extends Controller
             ->oldest('submitted_at')
             ->paginate(10);
 
-        return view('dashboard.approver', compact('stats', 'reviewQueue'));
+        $handoffs = $user->notifications()
+            ->whereIn('type', $this->handoffTypes())
+            ->latest()
+            ->take(6)
+            ->get();
+
+        return view('dashboard.approver', compact('stats', 'reviewQueue', 'handoffs'));
     }
 }

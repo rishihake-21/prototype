@@ -14,8 +14,14 @@
                 <button type="button" @click="removePracticalTask(index)" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
             </div>
             <div class="grid grid-cols-12 gap-4">
-                <div class="col-span-5">
-                    <label class="block text-sm text-gray-600">Task Title</label>
+                <div class="col-span-4">
+                    <label class="block text-sm text-gray-600">Laboratory Learning Outcome</label>
+                    <input type="text" x-model="task.llo" @input="updatePreview()" @keydown.enter.prevent
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="Example: Implement basic constructs of PHP">
+                </div>
+                <div class="col-span-4">
+                    <label class="block text-sm text-gray-600">Practical Exercise</label>
                     <input type="text" x-model="task.title" @input="updatePreview()" @keydown.enter.prevent
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
@@ -28,12 +34,12 @@
                         </template>
                     </select>
                 </div>
-                <div class="col-span-2">
+                <div class="col-span-1">
                     <label class="block text-sm text-gray-600">Hours</label>
                     <input type="number" x-model="task.hours" @input="updatePreview()" @keydown.enter.prevent min="0"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 </div>
-                <div class="col-span-3">
+                <div class="col-span-1">
                     <label class="block text-sm text-gray-600">Mapped CO</label>
                     <select x-model="task.co_code" @change="updatePreview()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">Select CO</option>

@@ -14,6 +14,8 @@ class Notification extends Model
     public const TYPE_SYLLABUS_APPROVED = 'syllabus_approved';
     public const TYPE_SYLLABUS_REJECTED = 'syllabus_rejected';
     public const TYPE_CHANGES_REQUESTED = 'changes_requested';
+    public const TYPE_ELECTIVE_POOL_UPDATED = 'elective_pool_updated';
+    public const TYPE_ELECTIVE_SELECTED = 'elective_selected';
 
     protected $fillable = [
         'user_id',

@@ -20,15 +20,6 @@
                 Programme: <strong>{{ $programme->name }}</strong> ({{ $programme->academic_year }})
             </p>
         </div>
-        <button type="button" @click="calculateFromCourses"
-                :disabled="calculating"
-                class="inline-flex items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition disabled:opacity-60">
-            <svg class="w-4 h-4" :class="{'animate-spin': calculating}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            <span x-text="calculating ? 'Calculating...' : 'Calculate from Courses'"></span>
-        </button>
     </div>
 
     @if(session('success'))
@@ -72,7 +63,8 @@
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Total Courses<br>Offered</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Courses to<br>Complete</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Compulsory<br>Courses</th>
-                        <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Elective<br>Courses</th>
+                        <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Elective<br>Offered</th>
+                        <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600 text-xs">Elective To<br>Complete</th>
                         <th colspan="4" class="px-3 py-2 text-center border border-indigo-600">Teaching Scheme</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Total<br>Credits</th>
                         <th rowspan="2" class="px-3 py-3 text-center align-middle border border-indigo-600">Total<br>Marks</th>
@@ -100,7 +92,8 @@
                             offered: {{ $s?->total_courses_offered ?? 0 }},
                             toComplete: {{ $s?->courses_to_complete ?? 0 }},
                             comp: {{ $s?->compulsory_count ?? 0 }},
-                            elec: {{ $s?->elective_count ?? 0 }},
+                            elecOffered: {{ $s?->elective_offered_count ?? $s?->elective_count ?? 0 }},
+                            elecToComplete: {{ $s?->elective_count ?? 0 }},
                             get totalHrs() { return this.th + this.tu + this.pr; },
                             get warning() {
                                 return this.toComplete > this.offered
@@ -149,8 +142,15 @@
 
                         {{-- Elective Courses --}}
                         <td class="px-3 py-2 border border-gray-200">
+                            <input type="number" name="rows[{{ $level->id }}][elective_offered_count]"
+                                   x-model.number="elecOffered" min="0"
+                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                        </td>
+
+                        {{-- Elective Courses To Complete --}}
+                        <td class="px-3 py-2 border border-gray-200">
                             <input type="number" name="rows[{{ $level->id }}][elective_count]"
-                                   x-model.number="elec" min="0"
+                                   x-model.number="elecToComplete" min="0"
                                    class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
                         </td>
 
@@ -220,7 +220,8 @@
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.offered"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.toComplete"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.comp"></td>
-                        <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.elec"></td>
+                        <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.elecOffered"></td>
+                        <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.elecToComplete"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.th"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.tu"></td>
                         <td class="px-3 py-3 text-center border border-gray-200" x-text="totals.pr"></td>
@@ -254,7 +255,6 @@
 function schemeForm() {
     return {
         rows: [],
-        calculating: false,
         warnings: [],
 
         registerRow(rowData) {
@@ -266,60 +266,44 @@ function schemeForm() {
                 offered:    acc.offered    + (r.offered    || 0),
                 toComplete: acc.toComplete + (r.toComplete || 0),
                 comp:       acc.comp       + (r.comp       || 0),
-                elec:       acc.elec       + (r.elec       || 0),
+                elecOffered: acc.elecOffered + (r.elecOffered || 0),
+                elecToComplete: acc.elecToComplete + (r.elecToComplete || 0),
                 th:         acc.th         + (r.th         || 0),
                 tu:         acc.tu         + (r.tu         || 0),
                 pr:         acc.pr         + (r.pr         || 0),
                 hours:      acc.hours      + (r.totalHrs   || 0),
-            }), { offered: 0, toComplete: 0, comp: 0, elec: 0, th: 0, tu: 0, pr: 0, hours: 0 });
+            }), { offered: 0, toComplete: 0, comp: 0, elecOffered: 0, elecToComplete: 0, th: 0, tu: 0, pr: 0, hours: 0 });
         },
 
         init() { /* rows register themselves via x-init */ },
 
-        async calculateFromCourses() {
-            this.calculating = true;
-            this.warnings = [];
-            try {
-                const res = await fetch('{{ route('cdc.programmes.structure.calculate', $programme) }}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                        'Accept': 'application/json',
-                    },
-                });
-                const data = await res.json();
-                // data = { levelId: { th_hours, tu_hours, pr_hours, total_credits, total_marks, total_courses_offered } }
-                for (const [levelId, vals] of Object.entries(data)) {
-                    const row = this.rows.find(r => r.levelId == levelId);
-                    if (row) {
-                        row.th        = vals.th_hours || 0;
-                        row.tu        = vals.tu_hours || 0;
-                        row.pr        = vals.pr_hours || 0;
-                        row.offered   = vals.total_courses_offered || 0;
-                        // Update the credit/marks inputs directly (they're not x-bound)
-                        const credits = document.querySelector(`input[name="rows[${levelId}][total_credits]"]`);
-                        const marks   = document.querySelector(`input[name="rows[${levelId}][total_marks]"]`);
-                        if (credits) credits.value = vals.total_credits || 0;
-                        if (marks)   marks.value   = vals.total_marks   || 0;
-                    }
-                }
-                this.warnings = ['Values recalculated from course definitions. Click "Save Scheme" to persist.'];
-            } catch (e) {
-                this.warnings = ['Failed to fetch calculations. Please try again.'];
-            } finally {
-                this.calculating = false;
-            }
-        },
-
         submitForm(e) {
             this.warnings = [];
             const invalid = this.rows.filter(r => r.toComplete > r.offered);
+            const invalidElectives = this.rows.filter(r => r.elecToComplete > r.elecOffered);
+            const invalidOfferedBreakup = this.rows.filter(r => (r.comp + r.elecOffered) > r.offered);
+            const invalidToCompleteBreakup = this.rows.filter(r => (r.comp + r.elecToComplete) > r.toComplete);
             if (invalid.length) {
                 invalid.forEach(r => {
                     this.warnings.push(`Level ID ${r.levelId}: "Courses to Complete" cannot exceed "Total Courses Offered".`);
                 });
-                return;
             }
+            if (invalidElectives.length) {
+                invalidElectives.forEach(r => {
+                    this.warnings.push(`Level ID ${r.levelId}: "Elective To Complete" cannot exceed "Elective Offered".`);
+                });
+            }
+            if (invalidOfferedBreakup.length) {
+                invalidOfferedBreakup.forEach(r => {
+                    this.warnings.push(`Level ID ${r.levelId}: compulsory courses plus elective offered cannot exceed total courses offered.`);
+                });
+            }
+            if (invalidToCompleteBreakup.length) {
+                invalidToCompleteBreakup.forEach(r => {
+                    this.warnings.push(`Level ID ${r.levelId}: compulsory courses plus elective to complete cannot exceed courses to complete.`);
+                });
+            }
+            if (this.warnings.length) return;
             e.target.submit();
         },
     };

@@ -77,14 +77,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Programmes (CRUD)
         Route::resource('programmes', ProgrammeController::class);
+        Route::get('programmes/{programme}/booklet',
+            [ProgrammeController::class, 'booklet'])->name('programmes.booklet');
+        Route::get('programmes/{programme}/booklet/download-pdf',
+            [ProgrammeController::class, 'downloadBookletPdf'])->name('programmes.booklet.download-pdf');
 
         // Scheme at a Glance (structure per programme)
         Route::get('programmes/{programme}/structure',
             [ProgrammeStructureController::class, 'index'])->name('programmes.structure');
         Route::put('programmes/{programme}/structure',
             [ProgrammeStructureController::class, 'update'])->name('programmes.structure.update');
-        Route::post('programmes/{programme}/structure/calculate',
-            [ProgrammeStructureController::class, 'calculate'])->name('programmes.structure.calculate');
 
         // Level-wise Course Definition (Bulk & Individual)
         Route::get('programmes/{programme}/courses',

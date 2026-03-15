@@ -4,6 +4,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
         prefill,
         programmesMetadata,
         isInitializing: false,
+        definitionLocked: false,
         currentStep: 0,
         steps: [
             'Basic Info',
@@ -33,6 +34,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             elective_group: '',
             is_part_of_group: false,
             assignment_id: null,
+            course_id: null,
             level: null,
 
             // Step 2: Teaching Scheme
@@ -59,6 +61,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
 
             // Step 3: Course Content
             rationale: '',
+            industry_employer_outcome: '',
             course_objectives: [],
             course_outcomes: [],
             units: [],
@@ -78,6 +81,8 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             books: [],
             software_websites: [],
             equipment_list: [],
+            self_learning: 'Not Applicable',
+            special_instructional_strategies: [],
 
             // Step 6: Mapping Matrix
             mapping_matrix: [],
@@ -111,6 +116,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 this.form.elective_group = s.elective_group || '';
                 this.form.is_part_of_group = !!s.is_part_of_group;
                 this.form.assignment_id = s.assignment_id || null;
+                this.form.course_id = s.course_id || null;
 
                 this.form.scheme_type = s.scheme_type || 'standard';
 
@@ -131,6 +137,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 }
 
                 this.form.rationale = s.rationale || '';
+                this.form.industry_employer_outcome = s.industry_employer_outcome || '';
                 this.form.course_objectives = s.course_objectives || [];
                 this.form.course_outcomes = s.course_outcomes || [];
                 this.form.units = s.units || [];
@@ -147,6 +154,8 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 this.form.books = s.books || [];
                 this.form.software_websites = s.software_websites || [];
                 this.form.equipment_list = s.equipment_list || [];
+                this.form.self_learning = s.self_learning || 'Not Applicable';
+                this.form.special_instructional_strategies = s.special_instructional_strategies || [];
                 this.form.mapping_matrix = s.mapping_matrix || [];
                 this.form.question_paper_profile = s.question_paper_profile || [];
 
@@ -165,6 +174,13 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
 
                 // Set level & scheme info from course code
                 this.onCourseCodeChange();
+
+                if (this.form.course_id) {
+                    this.definitionLocked = true;
+                    if (this.form.course_code && this.form.program_name) {
+                        this.fetchCourseData(this.form.course_code);
+                    }
+                }
 
                 // Ensure mapping matrix and paper profile align with COs/units
                 this.updateMappingMatrix();
@@ -221,6 +237,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
         fillContentOnly() {
             // Step 3: Narrative
             this.form.rationale = 'This course focuses on digital logic design, combining theoretical principles with practical laboratory skills to build robust Electronic systems.';
+            this.form.industry_employer_outcome = 'Develop and test digital electronic circuits for practical engineering applications.';
             this.form.course_objectives = [
                 'Analyze the operation of fundamental electronic logic gates.',
                 'Design combinational and sequential circuits for real-world applications.',
@@ -287,6 +304,13 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             this.form.equipment_list = [
                 { s_no: 1, name: 'Digital IC Trainer Kit', specifications: 'DC Power 5V/12V, logic switches, LEDs.' },
                 { s_no: 2, name: 'Oscilloscope', specifications: 'Dual channel, 20MHz bandwidth.' },
+            ];
+
+            this.form.self_learning = 'Complete small circuit simulation exercises and explore online tutorials for reinforcement.';
+            this.form.special_instructional_strategies = [
+                'Guide students in undertaking micro projects.',
+                'Demonstrate students thoroughly before they start doing the practice.',
+                'Encourage students to refer different websites and videos for deeper understanding.',
             ];
 
             // Step 6: CO-PO mapping
@@ -471,6 +495,8 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
         fillFromCourse(c) {
             if (!c) return;
 
+            this.definitionLocked = true;
+            this.form.course_id = c.id || null;
             this.form.course_code = c.course_code || '';
             this.form.title = c.course_title || '';
 
@@ -484,6 +510,8 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
 
             if (c.departments && c.departments.length > 0) {
                 this.form.department_ids = c.departments.map(d => d.id);
+            } else if (c.programme && c.programme.department_id) {
+                this.form.department_ids = [c.programme.department_id];
             }
 
             if (c.level) {
@@ -506,8 +534,11 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             // Pre-fill examination scheme marks
             this.form.examination_scheme = Object.assign({}, this.form.examination_scheme, {
                 fa_th_max: c.test_max_marks || 30,
+                fa_th_min: c.test_min_marks || this.form.examination_scheme.fa_th_min || 0,
                 sa_th_max: c.theory_max_marks || 70,
+                sa_th_min: c.theory_min_marks || this.form.examination_scheme.sa_th_min || 0,
                 sa_pr_max: c.pr_max_marks || (c.or_max_marks || 0),
+                sa_pr_min: c.pr_min_marks || this.form.examination_scheme.sa_pr_min || 0,
                 tw_marks: c.tw_max_marks || 0, // Maps to SLA/TW
                 paper_duration: c.theory_paper_hrs || 3.0
             });
@@ -674,6 +705,7 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
         addPracticalTask() {
             this.form.practical_tasks.push({
                 s_no: this.form.practical_tasks.length + 1,
+                llo: '',
                 title: '',
                 hours: 0,
                 is_mandatory: false,
@@ -732,6 +764,15 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             this.form.equipment_list.forEach((eq, i) => {
                 eq.s_no = i + 1;
             });
+            this.updatePreview();
+        },
+
+        addInstructionalStrategy() {
+            this.form.special_instructional_strategies.push('');
+        },
+
+        removeInstructionalStrategy(index) {
+            this.form.special_instructional_strategies.splice(index, 1);
             this.updatePreview();
         },
 

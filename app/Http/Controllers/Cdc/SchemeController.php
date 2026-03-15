@@ -25,9 +25,10 @@ class SchemeController extends Controller
 
     public function store(Request $request)
     {
+        $currentYear = now()->year;
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:schemes,name',
-            'implemented_year' => 'nullable|integer',
+            'implemented_year' => 'nullable|integer|min:' . $currentYear,
             'description' => 'nullable|string',
             'is_active' => 'boolean',
             'learning_structure' => 'nullable|array',
@@ -48,6 +49,8 @@ class SchemeController extends Controller
             'levels.*.level_code' => 'required|string|max:20',
             'levels.*.level_name' => 'required|string|max:255',
             'levels.*.sort_order' => 'required|integer',
+        ], [
+            'implemented_year.min' => "Past-year schemes are not allowed. Select {$currentYear} or later.",
         ]);
 
         $scheme = Scheme::create([
@@ -76,9 +79,13 @@ class SchemeController extends Controller
 
     public function update(Request $request, Scheme $scheme)
     {
+        $currentYear = now()->year;
+        $minYear = $scheme->implemented_year !== null && (int) $scheme->implemented_year < $currentYear
+            ? (int) $scheme->implemented_year
+            : $currentYear;
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:schemes,name,' . $scheme->id,
-            'implemented_year' => 'nullable|integer',
+            'implemented_year' => 'nullable|integer|min:' . $minYear,
             'description' => 'nullable|string',
             'is_active' => 'boolean',
             'learning_structure' => 'nullable|array',
@@ -100,6 +107,10 @@ class SchemeController extends Controller
             'levels.*.level_code' => 'required|string|max:20',
             'levels.*.level_name' => 'required|string|max:255',
             'levels.*.sort_order' => 'required|integer',
+        ], [
+            'implemented_year.min' => $minYear < $currentYear
+                ? "Legacy schemes can keep their current implemented year ({$minYear}), but cannot be moved further into the past."
+                : "Past-year schemes are not allowed. Select {$currentYear} or later.",
         ]);
 
         $scheme->update([
