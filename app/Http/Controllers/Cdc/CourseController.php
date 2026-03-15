@@ -538,7 +538,7 @@ class CourseController extends Controller
 
     public function apiShow(Request $request, $code)
     {
-        $query = Course::with(['programme', 'level', 'departments', 'assessments.component'])
+        $query = Course::with(['programme.scheme', 'level', 'departments', 'assessments.component'])
             ->where('course_code', $code);
 
         // Filter by programme code if provided
@@ -565,6 +565,17 @@ class CourseController extends Controller
         foreach ($this->mapLegacyExamSchemeFields($course) as $k => $v) {
             $course->setAttribute($k, $v);
         }
+
+        $course->setAttribute('assessment_scheme_rows', $course->programme?->scheme?->getCourseAssessmentHeaderRows() ?? []);
+        $course->setAttribute('assessment_scheme_leaf_columns', $course->programme?->scheme?->getCourseAssessmentLeafColumns() ?? []);
+        $course->setAttribute('assessment_scheme_values', $course->assessments->map(function ($assessment) {
+            return [
+                'component_id' => (int) $assessment->component_id,
+                'component_name' => $assessment->component?->component_name,
+                'max_marks' => is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null,
+                'min_marks' => is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null,
+            ];
+        })->values());
 
         return response()->json($course);
     }

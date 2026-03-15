@@ -5,100 +5,134 @@
         </h2>
     </x-slot>
 
-    <div class="py-10">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
-            <section class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 px-8 py-8 text-white shadow-xl">
-                <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                    <div class="max-w-2xl">
-                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-200">Faculty Workflow</p>
-                        <h1 class="mt-3 text-3xl font-bold tracking-tight">Work on assigned syllabi without losing the review trail.</h1>
-                        <p class="mt-3 text-sm leading-6 text-slate-200">
-                            Start from the active assignment list, continue drafts, and track what is under HOD review or waiting for revision.
+    <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 xl:grid-cols-[280px,minmax(0,1fr)] gap-6 xl:gap-8 items-start">
+            <div>
+                <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-5 xl:p-6 sticky top-8 space-y-5">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">Faculty Workflow</h3>
+                        <p class="mt-2 text-sm text-gray-500">
+                            Use the assignment list first, then continue drafts and track review results.
                         </p>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[30rem]">
-                        <div class="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300">Active</div>
-                            <div class="mt-2 text-2xl font-bold">{{ $stats['active_assignments'] }}</div>
+
+                    <div class="space-y-2.5">
+                        <a href="#active-assignments" class="block rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition">
+                            Active Assignments
+                        </a>
+                        <a href="#recent-syllabi" class="block rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                            Recent Syllabi
+                        </a>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-4">
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Quick Summary</h4>
+                        <div class="mt-3 space-y-3 text-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">Open assignments</span>
+                                <span class="font-semibold text-gray-900">{{ $stats['active_assignments'] }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">Pending review</span>
+                                <span class="font-semibold text-indigo-600">{{ $stats['pending'] }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500">Overdue</span>
+                                <span class="font-semibold text-red-600">{{ $stats['overdue_assignments'] }}</span>
+                            </div>
                         </div>
-                        <div class="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300">Drafts</div>
-                            <div class="mt-2 text-2xl font-bold">{{ $stats['drafts'] }}</div>
-                        </div>
-                        <div class="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300">Pending</div>
-                            <div class="mt-2 text-2xl font-bold">{{ $stats['pending'] }}</div>
-                        </div>
-                        <div class="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-                            <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300">Overdue</div>
-                            <div class="mt-2 text-2xl font-bold">{{ $stats['overdue_assignments'] }}</div>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-4">
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Flow</h4>
+                        <div class="mt-3 space-y-3 text-sm text-gray-600">
+                            <p><span class="font-semibold text-gray-900">1.</span> Open the assigned course.</p>
+                            <p><span class="font-semibold text-gray-900">2.</span> Draft and update the syllabus.</p>
+                            <p><span class="font-semibold text-gray-900">3.</span> Watch for approval, rejection, or changes requested.</p>
                         </div>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr,1fr]">
-                <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+            <div class="min-w-0 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-200 rounded-xl p-6">
+                        <div class="text-gray-500 text-sm">Total Syllabi</div>
+                        <div class="text-3xl font-bold text-gray-900">{{ $stats['total'] }}</div>
+                    </div>
+                    <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-200 rounded-xl p-6">
+                        <div class="text-gray-500 text-sm">Drafts</div>
+                        <div class="text-3xl font-bold text-gray-900">{{ $stats['drafts'] }}</div>
+                    </div>
+                    <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-200 rounded-xl p-6">
+                        <div class="text-gray-500 text-sm">Approved</div>
+                        <div class="text-3xl font-bold text-green-600">{{ $stats['approved'] }}</div>
+                    </div>
+                    <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-200 rounded-xl p-6">
+                        <div class="text-gray-500 text-sm">Rejected</div>
+                        <div class="text-3xl font-bold text-red-600">{{ $stats['rejected'] }}</div>
+                    </div>
+                </div>
+
+                <div id="active-assignments" class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-200 rounded-xl">
+                    <div class="px-5 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900">Active Assignments</h3>
-                            <p class="mt-1 text-sm text-slate-500">This is your working queue. Start here before opening anything else.</p>
+                            <h3 class="text-lg font-medium text-gray-900">Active Assignments</h3>
+                            <p class="text-sm text-gray-500 mt-1">This is the main working queue for faculty.</p>
                         </div>
-                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                            {{ $assignments->count() }} Open
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            {{ $assignments->count() }} Total
                         </span>
                     </div>
 
-                    <div class="p-6">
+                    <div class="p-5 sm:p-6">
                         @if($assignments->count() > 0)
                             <div class="space-y-4">
                                 @foreach($assignments as $assign)
                                     @php
                                         $facultySyllabus = $assign->syllabi->firstWhere('submitted_by', auth()->id());
                                         $actionRoute = route('syllabi.create', ['assignment' => $assign->id]);
-                                        $actionLabel = 'Start syllabus';
+                                        $actionLabel = 'Start Syllabus';
 
                                         if ($facultySyllabus) {
                                             $actionRoute = $facultySyllabus->canBeEdited()
                                                 ? route('syllabi.edit', $facultySyllabus)
                                                 : route('syllabi.show', $facultySyllabus);
-                                            $actionLabel = $facultySyllabus->canBeEdited() ? 'Continue work' : 'View submission';
+                                            $actionLabel = $facultySyllabus->canBeEdited() ? 'Continue Work' : 'View Submission';
                                         }
 
                                         $badge = match($assign->status) {
-                                            \App\Models\CourseAssignment::STATUS_PENDING => 'bg-amber-100 text-amber-800 border-amber-200',
-                                            \App\Models\CourseAssignment::STATUS_IN_PROGRESS => 'bg-sky-100 text-sky-800 border-sky-200',
-                                            \App\Models\CourseAssignment::STATUS_SUBMITTED => 'bg-indigo-100 text-indigo-800 border-indigo-200',
-                                            \App\Models\CourseAssignment::STATUS_UNDER_REVIEW => 'bg-blue-100 text-blue-800 border-blue-200',
-                                            \App\Models\CourseAssignment::STATUS_CHANGES_REQUESTED => 'bg-orange-100 text-orange-800 border-orange-200',
-                                            \App\Models\CourseAssignment::STATUS_REJECTED => 'bg-rose-100 text-rose-800 border-rose-200',
-                                            default => 'bg-slate-100 text-slate-700 border-slate-200',
+                                            \App\Models\CourseAssignment::STATUS_PENDING => 'bg-amber-100 text-amber-800',
+                                            \App\Models\CourseAssignment::STATUS_IN_PROGRESS => 'bg-sky-100 text-sky-800',
+                                            \App\Models\CourseAssignment::STATUS_SUBMITTED => 'bg-indigo-100 text-indigo-800',
+                                            \App\Models\CourseAssignment::STATUS_UNDER_REVIEW => 'bg-blue-100 text-blue-800',
+                                            \App\Models\CourseAssignment::STATUS_CHANGES_REQUESTED => 'bg-orange-100 text-orange-800',
+                                            \App\Models\CourseAssignment::STATUS_REJECTED => 'bg-rose-100 text-rose-800',
+                                            default => 'bg-gray-100 text-gray-800',
                                         };
                                         $isOverdue = $assign->deadline && $assign->deadline->isPast();
                                     @endphp
-                                    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-                                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                            <div class="space-y-3">
-                                                <div>
-                                                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $assign->course->programme->code }} / {{ $assign->course->level->level_code }}</div>
-                                                    <h4 class="mt-1 text-lg font-semibold text-slate-900">{{ $assign->course->course_code }} - {{ $assign->course->course_title }}</h4>
-                                                    <p class="mt-1 text-sm text-slate-500">Assigned by {{ $assign->assigner->name }} for {{ $assign->academic_year }}</p>
-                                                </div>
-                                                <div class="flex flex-wrap items-center gap-2 text-sm">
-                                                    <span class="rounded-full border px-3 py-1 text-xs font-semibold {{ $badge }}">
+                                    <div class="rounded-xl border border-gray-200 p-4 sm:p-5">
+                                        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-bold text-gray-900">{{ $assign->course->course_code }} - {{ $assign->course->course_title }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">{{ $assign->course->programme->code }} / {{ $assign->course->level->level_code }} / {{ $assign->academic_year }}</div>
+                                                <div class="text-xs text-gray-500 mt-1">Assigned by {{ $assign->assigner->name }}</div>
+                                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ $badge }}">
                                                         {{ ucfirst(str_replace('_', ' ', $assign->status)) }}
                                                     </span>
-                                                    <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 border border-slate-200">
+                                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
                                                         Deadline: {{ $assign->deadline?->format('d M Y') ?? 'Not set' }}
                                                     </span>
                                                     @if($isOverdue)
-                                                        <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 border border-red-200">
+                                                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
                                                             Overdue
                                                         </span>
                                                     @endif
                                                 </div>
                                             </div>
-                                            <a href="{{ $actionRoute }}" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
+                                            <a href="{{ $actionRoute }}" class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 transition xl:self-start">
                                                 {{ $actionLabel }}
                                             </a>
                                         </div>
@@ -106,117 +140,64 @@
                                 @endforeach
                             </div>
                         @else
-                            <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-                                <p class="text-lg font-semibold text-slate-700">No active assignments right now.</p>
-                                <p class="mt-2 text-sm text-slate-500">When HOD assigns a course to you, it will appear here as the first step in your workflow.</p>
+                            <div class="py-12 text-center text-gray-500">
+                                No active assignments right now.
                             </div>
                         @endif
                     </div>
                 </div>
 
-                <div class="space-y-6">
-                    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <h3 class="text-lg font-semibold text-slate-900">Your Process</h3>
-                        <div class="mt-5 space-y-4">
-                            <div class="flex gap-4">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">1</div>
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-800">Open assigned course</p>
-                                    <p class="text-xs text-slate-500">Start only from the assignment queue so scheme and course data stay linked.</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-4">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">2</div>
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-800">Draft and refine</p>
-                                    <p class="text-xs text-slate-500">Continue work from the same assignment card until you are ready to submit.</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-4">
-                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">3</div>
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-800">Watch review status</p>
-                                    <p class="text-xs text-slate-500">Track submitted, under-review, and changes-requested stages from one place.</p>
-                                </div>
-                            </div>
-                        </div>
+                <div id="recent-syllabi" class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-200 rounded-xl">
+                    <div class="px-5 sm:px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">Recent Syllabi</h3>
+                        <p class="text-sm text-gray-500 mt-1">Latest syllabus records and their current state.</p>
                     </div>
-
-                    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="rounded-2xl bg-slate-50 p-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Approved</div>
-                                <div class="mt-2 text-3xl font-bold text-emerald-600">{{ $stats['approved'] }}</div>
-                            </div>
-                            <div class="rounded-2xl bg-slate-50 p-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Rejected</div>
-                                <div class="mt-2 text-3xl font-bold text-rose-600">{{ $stats['rejected'] }}</div>
-                            </div>
-                            <div class="rounded-2xl bg-slate-50 p-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Total</div>
-                                <div class="mt-2 text-3xl font-bold text-slate-900">{{ $stats['total'] }}</div>
-                            </div>
-                            <div class="rounded-2xl bg-slate-50 p-4">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Pending</div>
-                                <div class="mt-2 text-3xl font-bold text-indigo-600">{{ $stats['pending'] }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-                    <div>
-                        <h3 class="text-lg font-semibold text-slate-900">Recent Syllabi</h3>
-                        <p class="mt-1 text-sm text-slate-500">Your recent work and its current review state.</p>
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    @if($recentSyllabi->count() > 0)
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Title</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Course Code</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 bg-white">
-                                @foreach($recentSyllabi as $syllabus)
-                                    <tr class="hover:bg-slate-50">
-                                        <td class="px-6 py-4 text-sm font-medium text-slate-900">{{ $syllabus->title }}</td>
-                                        <td class="px-6 py-4 text-sm text-slate-600">{{ $syllabus->course_code }}</td>
-                                        <td class="px-6 py-4">
-                                            <span class="rounded-full px-3 py-1 text-xs font-semibold
-                                                @if($syllabus->isDraft()) bg-slate-100 text-slate-700
-                                                @elseif($syllabus->isSubmitted()) bg-indigo-100 text-indigo-700
-                                                @elseif($syllabus->isApproved()) bg-emerald-100 text-emerald-700
-                                                @elseif($syllabus->isRejected()) bg-rose-100 text-rose-700
-                                                @elseif($syllabus->isChangesRequested()) bg-orange-100 text-orange-700
-                                                @elseif($syllabus->isUnderReview()) bg-blue-100 text-blue-700
-                                                @endif">
-                                                {{ ucfirst(str_replace('_', ' ', $syllabus->status)) }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm">
-                                            <a href="{{ route('syllabi.show', $syllabus) }}" class="font-semibold text-indigo-600 hover:text-indigo-800">View</a>
-                                            @if($syllabus->canBeEdited())
-                                                <a href="{{ route('syllabi.edit', $syllabus) }}" class="ml-4 font-semibold text-slate-700 hover:text-slate-900">Edit</a>
-                                            @endif
-                                        </td>
+                    <div class="overflow-x-auto">
+                        @if($recentSyllabi->count() > 0)
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Course Code</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    @else
-                        <div class="px-6 py-12 text-center text-sm text-slate-500">
-                            No syllabi created yet.
-                        </div>
-                    @endif
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    @foreach($recentSyllabi as $syllabus)
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $syllabus->title }}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600">{{ $syllabus->course_code }}</td>
+                                            <td class="px-6 py-4">
+                                                <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                                                    @if($syllabus->isDraft()) bg-gray-100 text-gray-800
+                                                    @elseif($syllabus->isSubmitted()) bg-indigo-100 text-indigo-800
+                                                    @elseif($syllabus->isApproved()) bg-green-100 text-green-800
+                                                    @elseif($syllabus->isRejected()) bg-red-100 text-red-800
+                                                    @elseif($syllabus->isChangesRequested()) bg-orange-100 text-orange-800
+                                                    @elseif($syllabus->isUnderReview()) bg-blue-100 text-blue-800
+                                                    @endif">
+                                                    {{ ucfirst(str_replace('_', ' ', $syllabus->status)) }}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm">
+                                                <a href="{{ route('syllabi.show', $syllabus) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">View</a>
+                                                @if($syllabus->canBeEdited())
+                                                    <a href="{{ route('syllabi.edit', $syllabus) }}" class="ml-4 text-gray-700 hover:text-gray-900 font-medium">Edit</a>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        @else
+                            <div class="px-6 py-12 text-center text-gray-500">
+                                No syllabi created yet.
+                            </div>
+                        @endif
+                    </div>
                 </div>
-            </section>
+            </div>
         </div>
     </div>
 </x-app-layout>

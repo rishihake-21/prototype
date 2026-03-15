@@ -58,6 +58,9 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 tw_marks: 0,
                 is_internal_practical: false
             },
+            assessment_scheme_rows: [],
+            assessment_scheme_leaf_columns: [],
+            assessment_scheme_values: [],
 
             // Step 3: Course Content
             rationale: '',
@@ -135,6 +138,9 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 if (s.examination_scheme) {
                     this.form.examination_scheme = Object.assign({}, this.form.examination_scheme, s.examination_scheme);
                 }
+                this.form.assessment_scheme_rows = Array.isArray(s.assessment_scheme_rows) ? s.assessment_scheme_rows : [];
+                this.form.assessment_scheme_leaf_columns = Array.isArray(s.assessment_scheme_leaf_columns) ? s.assessment_scheme_leaf_columns : [];
+                this.form.assessment_scheme_values = Array.isArray(s.assessment_scheme_values) ? s.assessment_scheme_values : [];
 
                 this.form.rationale = s.rationale || '';
                 this.form.industry_employer_outcome = s.industry_employer_outcome || '';
@@ -214,6 +220,10 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 this.calculateCredits();
 
                 this.isInitializing = false;
+
+                if (this.form.course_code && this.form.program_name) {
+                    this.fetchCourseData(this.form.course_code);
+                }
             } else {
                 // Initialize with default values for create mode
                 this.addObjective();
@@ -451,11 +461,11 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
 
             fetch(url)
                 .then(res => res.json())
-                .then(data => {
-                    if (data && !data.error) {
-                        this.fillFromCourse(data);
-                        this.calculateCredits();
-                    }
+                  .then(data => {
+                      if (data && !data.error) {
+                         this.fillFromCourse(data);
+                          this.calculateCredits();
+                      }
                 })
                 .catch(err => console.error('Auto-fetch failed:', err));
         },
@@ -520,27 +530,30 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
 
             // Pre-fill teaching scheme using Object.assign for reactivity
             this.form.teaching_scheme = Object.assign({}, this.form.teaching_scheme, {
-                th_hours: c.th_hours || 0, // CL
-                tu_hours: c.tu_hours || 0, // TU
-                pr_hours: c.pr_hours || 0, // LL
-                slh_hours: c.slh_hours || 0,
-                credits: c.credits || 0,
-                total_hours: (c.th_hours || 0) + (c.pr_hours || 0), // TL = CL + LL
-                nlh_hours: (c.th_hours || 0) + (c.pr_hours || 0) + (c.slh_hours || 0) // NLH = TL + SLH
+                th_hours: c.th_hours ?? 0, // CL
+                tu_hours: c.tu_hours ?? 0, // TU
+                pr_hours: c.pr_hours ?? 0, // LL
+                slh_hours: c.slh_hours ?? 0,
+                credits: c.credits ?? 0,
+                total_hours: (c.th_hours ?? 0) + (c.pr_hours ?? 0), // TL = CL + LL
+                nlh_hours: (c.th_hours ?? 0) + (c.pr_hours ?? 0) + (c.slh_hours ?? 0) // NLH = TL + SLH
             });
 
-            this.form.iks_hours = c.iks_hours || 0;
+            this.form.iks_hours = c.iks_hours ?? 0;
+            this.form.assessment_scheme_rows = Array.isArray(c.assessment_scheme_rows) ? c.assessment_scheme_rows : [];
+            this.form.assessment_scheme_leaf_columns = Array.isArray(c.assessment_scheme_leaf_columns) ? c.assessment_scheme_leaf_columns : [];
+            this.form.assessment_scheme_values = Array.isArray(c.assessment_scheme_values) ? c.assessment_scheme_values : [];
 
             // Pre-fill examination scheme marks
             this.form.examination_scheme = Object.assign({}, this.form.examination_scheme, {
-                fa_th_max: c.test_max_marks || 30,
-                fa_th_min: c.test_min_marks || this.form.examination_scheme.fa_th_min || 0,
-                sa_th_max: c.theory_max_marks || 70,
-                sa_th_min: c.theory_min_marks || this.form.examination_scheme.sa_th_min || 0,
-                sa_pr_max: c.pr_max_marks || (c.or_max_marks || 0),
-                sa_pr_min: c.pr_min_marks || this.form.examination_scheme.sa_pr_min || 0,
-                tw_marks: c.tw_max_marks || 0, // Maps to SLA/TW
-                paper_duration: c.theory_paper_hrs || 3.0
+                fa_th_max: c.test_max_marks ?? this.form.examination_scheme.fa_th_max ?? 0,
+                fa_th_min: c.test_min_marks ?? this.form.examination_scheme.fa_th_min ?? 0,
+                sa_th_max: c.theory_max_marks ?? this.form.examination_scheme.sa_th_max ?? 0,
+                sa_th_min: c.theory_min_marks ?? this.form.examination_scheme.sa_th_min ?? 0,
+                sa_pr_max: c.pr_max_marks ?? c.or_max_marks ?? this.form.examination_scheme.sa_pr_max ?? 0,
+                sa_pr_min: c.pr_min_marks ?? this.form.examination_scheme.sa_pr_min ?? 0,
+                tw_marks: c.tw_max_marks ?? this.form.examination_scheme.tw_marks ?? 0, // Maps to SLA/TW
+                paper_duration: c.theory_paper_hrs ?? this.form.examination_scheme.paper_duration ?? 0
             });
 
             if (c.course_type === 'elective') {
@@ -548,6 +561,21 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             }
 
             console.log('Autofilled constants from CDC:', c.course_code);
+        },
+
+        getAssessmentCellValue(componentId, kind = 'max_marks') {
+            const id = parseInt(componentId);
+            if (!Array.isArray(this.form.assessment_scheme_values)) {
+                return '--';
+            }
+
+            const match = this.form.assessment_scheme_values.find((item) => parseInt(item.component_id) === id);
+            if (!match) {
+                return '--';
+            }
+
+            const value = match[kind];
+            return value === null || value === undefined || value === '' ? '--' : value;
         },
 
         // Scheme type change handler - Now simplified

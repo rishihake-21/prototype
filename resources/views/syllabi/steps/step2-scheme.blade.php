@@ -57,6 +57,40 @@
     <!-- Assessment Scheme -->
     <div class="bg-gray-50 p-4 rounded-md">
         <h4 class="font-medium text-gray-700 mb-4">Assessment Scheme (FA-TH / SA-TH / FA-PR / SA-PR / SLA)</h4>
+
+        <div x-show="Array.isArray(form.assessment_scheme_rows) && form.assessment_scheme_rows.length > 0" class="mb-6 overflow-x-auto rounded-md border border-gray-200 bg-white">
+            <table class="min-w-full border-collapse text-sm">
+                <thead class="bg-gray-100 text-gray-700">
+                    <template x-for="(row, rowIndex) in form.assessment_scheme_rows" :key="'scheme-row-' + rowIndex">
+                        <tr>
+                            <template x-for="(cell, cellIndex) in row" :key="'scheme-cell-' + rowIndex + '-' + cellIndex">
+                                <th
+                                    class="border border-gray-200 px-3 py-2 text-center font-medium"
+                                    :colspan="cell.colspan || 1"
+                                    :rowspan="cell.rowspan || 1"
+                                    x-text="cell.name">
+                                </th>
+                            </template>
+                        </tr>
+                    </template>
+                </thead>
+                <tbody>
+                    <tr>
+                        <template x-for="leaf in form.assessment_scheme_leaf_columns" :key="'scheme-value-' + leaf.id">
+                            <td class="border border-gray-200 px-3 py-2 text-center text-gray-800">
+                                <div class="font-medium" x-text="getAssessmentCellValue(leaf.id, 'max_marks')"></div>
+                                <div class="text-xs text-gray-500" x-show="getAssessmentCellValue(leaf.id, 'min_marks') !== '--'">
+                                    Min: <span x-text="getAssessmentCellValue(leaf.id, 'min_marks')"></span>
+                                </div>
+                            </td>
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="px-3 py-2 text-xs text-gray-500">
+                This table is auto-fetched from the linked CDC Course Definition and current scheme.
+            </p>
+        </div>
         
         <!-- Formative Assessment (FA-TH) -->
         <div class="mb-4">

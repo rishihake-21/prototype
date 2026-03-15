@@ -84,6 +84,11 @@ class Course extends Model
         return $this->hasMany(CourseAssessment::class);
     }
 
+    public function assignments()
+    {
+        return $this->hasMany(CourseAssignment::class);
+    }
+
     // -- Computed helpers --
 
     public function computedTotalHours(): int

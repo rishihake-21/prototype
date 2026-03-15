@@ -90,7 +90,14 @@ class DashboardController extends Controller
             ->take(10)
             ->get();
 
-        return view('dashboard.cdc', compact('stats', 'recentProgrammes', 'handoffs', 'workflowAssignments'));
+        $coursesReadyForHod = \App\Models\Course::query()
+            ->with(['programme', 'level'])
+            ->doesntHave('assignments')
+            ->latest()
+            ->take(6)
+            ->get();
+
+        return view('dashboard.cdc', compact('stats', 'recentProgrammes', 'handoffs', 'workflowAssignments', 'coursesReadyForHod'));
     }
 
     public function creator()
