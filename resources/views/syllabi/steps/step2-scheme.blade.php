@@ -8,6 +8,38 @@
     <!-- Teaching / Learning Scheme -->
     <div class="bg-gray-50 p-4 rounded-md">
         <h4 class="font-medium text-gray-700 mb-4" x-text="'Scheme: ' + (form.academic_year ? form.academic_year.split('-')[0] : 'Standard')"></h4>
+
+        <div x-show="Array.isArray(form.learning_scheme_rows) && form.learning_scheme_rows.length > 0" class="mb-6 overflow-x-auto rounded-md border border-gray-200 bg-white">
+            <table class="min-w-full border-collapse text-sm">
+                <thead class="bg-gray-100 text-gray-700">
+                    <template x-for="(row, rowIndex) in form.learning_scheme_rows" :key="'learning-row-' + rowIndex">
+                        <tr>
+                            <template x-for="(cell, cellIndex) in row" :key="'learning-cell-' + rowIndex + '-' + cellIndex">
+                                <th
+                                    class="border border-gray-200 px-3 py-2 text-center font-medium"
+                                    :colspan="cell.colspan || 1"
+                                    :rowspan="cell.rowspan || 1"
+                                    x-text="cell.name">
+                                </th>
+                            </template>
+                        </tr>
+                    </template>
+                </thead>
+                <tbody>
+                    <tr>
+                        <template x-for="leaf in form.learning_scheme_leaf_columns" :key="'learning-value-' + leaf.id">
+                            <td class="border border-gray-200 px-3 py-2 text-center text-gray-800">
+                                <div class="font-medium" x-text="getLearningCellValue(leaf.id)"></div>
+                            </td>
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="px-3 py-2 text-xs text-gray-500">
+                Teaching / Learning scheme columns are fetched from the linked scheme metadata snapshot.
+            </p>
+        </div>
+
         <div class="grid grid-cols-4 gap-4 mb-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Classroom Learning (CL)</label>
@@ -56,7 +88,7 @@
 
     <!-- Assessment Scheme -->
     <div class="bg-gray-50 p-4 rounded-md">
-        <h4 class="font-medium text-gray-700 mb-4">Assessment Scheme (FA-TH / SA-TH / FA-PR / SA-PR / SLA)</h4>
+        <h4 class="font-medium text-gray-700 mb-4">Assessment Scheme</h4>
 
         <div x-show="Array.isArray(form.assessment_scheme_rows) && form.assessment_scheme_rows.length > 0" class="mb-6 overflow-x-auto rounded-md border border-gray-200 bg-white">
             <table class="min-w-full border-collapse text-sm">
@@ -88,7 +120,7 @@
                 </tbody>
             </table>
             <p class="px-3 py-2 text-xs text-gray-500">
-                This table is auto-fetched from the linked CDC Course Definition and current scheme.
+                Assessment columns are fetched from the linked scheme metadata snapshot.
             </p>
         </div>
         

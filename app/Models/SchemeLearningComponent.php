@@ -12,6 +12,11 @@ class SchemeLearningComponent extends Model
         'component_code',
         'component_name',
         'type',
+        'usage_scope',
+        'semantic_key',
+        'value_kind',
+        'entry_mode',
+        'total_role',
         'display_order',
     ];
 
@@ -35,4 +40,3 @@ class SchemeLearningComponent extends Model
         return $this->children()->count() === 0;
     }
 }
-

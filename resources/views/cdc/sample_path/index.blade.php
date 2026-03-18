@@ -23,23 +23,8 @@
     <div class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">{{ session('success') }}</div>
     @endif
 
-    {{-- Entry Level switcher --}}
-    <div class="flex items-center gap-4 mb-6">
-        <span class="text-sm font-medium text-gray-700">Entry Level:</span>
-        @foreach($entryLevels as $el)
-            <a href="{{ route('cdc.programmes.sample-path', ['programme' => $programme, 'entry_level' => $el]) }}"
-               class="px-3 py-1.5 rounded-lg text-sm font-medium transition
-                {{ $entryLevel === $el
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                {{ $el }}
-            </a>
-        @endforeach
-    </div>
-
     <form method="POST" action="{{ route('cdc.programmes.sample-path.update', $programme) }}">
         @csrf @method('PUT')
-        <input type="hidden" name="entry_level" value="{{ $entryLevel }}">
 
         <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl overflow-x-auto">
             <table class="min-w-full text-xs border-collapse">
@@ -115,7 +100,7 @@
             </a>
         </div>
         <p class="mt-3 text-xs text-gray-400">
-            Check the box to assign a course to a particular term. A course can appear in only one term per entry level.
+            Check the box to assign a course to a particular term. A course can appear in only one term in the sample path.
             Terms: Odd = 1st semester of academic year, Even = 2nd semester.
         </p>
         @endif

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Course;
 use App\Models\CourseAssignment;
+use App\Models\Scheme;
 use App\Models\Syllabus;
 use App\Models\User;
 
@@ -374,6 +375,17 @@ class SyllabusService
             'paper_duration' => $course->theory_paper_hrs,
         ]);
 
+        $scheme = $course->programme?->scheme;
+        if ($scheme) {
+            $dynamicSnapshot = $this->buildDynamicSchemeSnapshot($course, $scheme, $data['teaching_scheme'], $data['examination_scheme']);
+            $data['learning_scheme_rows'] = $dynamicSnapshot['learning_scheme_rows'];
+            $data['learning_scheme_leaf_columns'] = $dynamicSnapshot['learning_scheme_leaf_columns'];
+            $data['learning_scheme_values'] = $dynamicSnapshot['learning_scheme_values'];
+            $data['assessment_scheme_rows'] = $dynamicSnapshot['assessment_scheme_rows'];
+            $data['assessment_scheme_leaf_columns'] = $dynamicSnapshot['assessment_scheme_leaf_columns'];
+            $data['assessment_scheme_values'] = $dynamicSnapshot['assessment_scheme_values'];
+        }
+
         $ownedDepartmentId = $course->programme?->department_id;
         $mappedDepartmentIds = $course->departments->pluck('id')->map(fn ($id) => (int) $id)->all();
         $resolvedDepartmentIds = collect($mappedDepartmentIds)
@@ -407,8 +419,40 @@ class SyllabusService
 
         foreach ($course->assessments as $assessment) {
             $name = strtolower(trim((string) ($assessment->component?->component_name ?? '')));
+            $semanticKey = strtolower(trim((string) ($assessment->component?->semantic_key ?? '')));
             $max = is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null;
             $min = is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null;
+
+            if ($semanticKey !== '') {
+                if ($semanticKey === 'fa_th_max' && $out['fa_th_max'] === null) {
+                    $out['fa_th_max'] = $max;
+                    continue;
+                }
+                if ($semanticKey === 'fa_th_min' && $out['fa_th_min'] === null) {
+                    $out['fa_th_min'] = $min ?? $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_th_max' && $out['sa_th_max'] === null) {
+                    $out['sa_th_max'] = $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_th_min' && $out['sa_th_min'] === null) {
+                    $out['sa_th_min'] = $min ?? $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_pr_max' && $out['sa_pr_max'] === null) {
+                    $out['sa_pr_max'] = $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_pr_min' && $out['sa_pr_min'] === null) {
+                    $out['sa_pr_min'] = $min ?? $max;
+                    continue;
+                }
+                if (in_array($semanticKey, ['tw_max', 'sla_max'], true) && $out['tw_marks'] === null) {
+                    $out['tw_marks'] = $max;
+                    continue;
+                }
+            }
 
             if (($out['fa_th_max'] === null) && str_contains($name, 'fa-th') && str_contains($name, 'max')) {
                 $out['fa_th_max'] = $max;
@@ -448,5 +492,69 @@ class SyllabusService
         $out['tw_marks'] ??= 0;
 
         return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $teachingScheme
+     * @param array<string,mixed> $examScheme
+     * @return array<string,mixed>
+     */
+    private function buildDynamicSchemeSnapshot(Course $course, Scheme $scheme, array $teachingScheme, array $examScheme): array
+    {
+        $learningLeafColumns = $scheme->getSyllabusLearningLeafColumns();
+        $assessmentLeafColumns = $scheme->getSyllabusAssessmentLeafColumns();
+
+        $learningValues = array_map(function (array $leaf) use ($scheme, $course, $teachingScheme) {
+            $semanticKey = $leaf['semantic_key'] ?? $scheme->inferLearningSemanticKey((string) ($leaf['name'] ?? ''));
+            $value = match ($semanticKey) {
+                'th_hours' => (int) ($teachingScheme['th_hours'] ?? $course->th_hours ?? 0),
+                'tu_hours' => (int) ($teachingScheme['tu_hours'] ?? $course->tu_hours ?? 0),
+                'pr_hours' => (int) ($teachingScheme['pr_hours'] ?? $course->pr_hours ?? 0),
+                'total_hours' => (int) ($teachingScheme['total_hours'] ?? $course->total_hours ?? 0),
+                'credits' => (float) ($teachingScheme['credits'] ?? $course->credits ?? 0),
+                'slh_hours' => (int) ($teachingScheme['slh_hours'] ?? 0),
+                'nlh_hours' => (int) ($teachingScheme['nlh_hours'] ?? (($course->total_hours ?? 0) + ($teachingScheme['slh_hours'] ?? 0))),
+                default => null,
+            };
+
+            return [
+                'component_id' => (int) $leaf['id'],
+                'component_name' => $leaf['name'] ?? null,
+                'semantic_key' => $semanticKey,
+                'value' => $value,
+            ];
+        }, $learningLeafColumns);
+
+        $assessmentValuesByComponent = $course->assessments->keyBy('component_id');
+        $assessmentValues = array_map(function (array $leaf) use ($assessmentValuesByComponent, $examScheme) {
+            $componentId = (int) $leaf['id'];
+            $semanticKey = $leaf['semantic_key'] ?? null;
+            $assessment = $assessmentValuesByComponent->get($componentId);
+
+            $max = $assessment ? (is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null) : null;
+            $min = $assessment ? (is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null) : null;
+
+            if ($semanticKey === 'paper_duration') {
+                $max = is_numeric($examScheme['paper_duration'] ?? null) ? (float) $examScheme['paper_duration'] : null;
+                $min = null;
+            }
+
+            return [
+                'component_id' => $componentId,
+                'component_name' => $leaf['name'] ?? null,
+                'semantic_key' => $semanticKey,
+                'max_marks' => $max,
+                'min_marks' => $min,
+            ];
+        }, $assessmentLeafColumns);
+
+        return [
+            'learning_scheme_rows' => $scheme->getSyllabusLearningHeaderRows(),
+            'learning_scheme_leaf_columns' => $learningLeafColumns,
+            'learning_scheme_values' => $learningValues,
+            'assessment_scheme_rows' => $scheme->getSyllabusAssessmentHeaderRows(),
+            'assessment_scheme_leaf_columns' => $assessmentLeafColumns,
+            'assessment_scheme_values' => $assessmentValues,
+        ];
     }
 }

@@ -15,9 +15,6 @@ class SamplePathController extends Controller
      */
     public function index(Request $request, Programme $programme)
     {
-        $entryLevel = $request->input('entry_level', '10+');
-        $entryLevels = ['10+', '12+', 'Lateral'];
-
         // Load courses (non-deleted, sorted by level then code)
         $courses = $programme->courses()
             ->with('level')
@@ -26,17 +23,18 @@ class SamplePathController extends Controller
             ->orderBy('course_code')
             ->get();
 
-        // Load current assignments for this entry level
+        // Load current assignments from the single programme-wide sample path.
+        // Older 10+/12+/Lateral rows are still read as fallback compatibility data.
         $assigned = SamplePath::where('programme_id', $programme->id)
-            ->where('entry_level', $entryLevel)
+            ->whereIn('entry_level', SamplePath::canonicalEntryLevels())
             ->get()
             ->groupBy('term_number')  // [term => Collection of SamplePath]
-            ->map(fn($paths) => $paths->pluck('course_id')->flip()); // [term => {course_id => 0}]
+            ->map(fn($paths) => $paths->pluck('course_id')->unique()->flip()); // [term => {course_id => 0}]
 
         $terms = range(1, 6);
 
         return view('cdc.sample_path.index', compact(
-            'programme', 'courses', 'assigned', 'terms', 'entryLevel', 'entryLevels'
+            'programme', 'courses', 'assigned', 'terms'
         ));
     }
 
@@ -46,7 +44,6 @@ class SamplePathController extends Controller
     public function update(Request $request, Programme $programme)
     {
         $request->validate([
-            'entry_level' => 'required|string|max:20',
             'terms'       => 'nullable|array',
             'terms.*'     => 'array',
             'terms.*.*'   => [
@@ -58,23 +55,20 @@ class SamplePathController extends Controller
             ],
         ]);
 
-        $entryLevel = $request->input('entry_level');
-
-        // Delete existing for this entry level
+        // Delete the full programme-wide sample path, including legacy entry buckets.
         SamplePath::where('programme_id', $programme->id)
-            ->where('entry_level', $entryLevel)
+            ->whereIn('entry_level', SamplePath::canonicalEntryLevels())
             ->delete();
 
-        // Re-insert
-        $assignments = $request->input('assignments', []);
-        // assignments is sent as "term_N[course_id]" -> we receive it as
-        // assignments[term_N] = [course_id1, course_id2, ...]
         foreach ($request->input('terms', []) as $term => $courseIds) {
-            if (!is_array($courseIds)) continue;
+            if (!is_array($courseIds)) {
+                continue;
+            }
+
             foreach ($courseIds as $courseId) {
                 SamplePath::create([
                     'programme_id' => $programme->id,
-                    'entry_level'  => $entryLevel,
+                    'entry_level'  => SamplePath::ENTRY_LEVEL_STANDARD,
                     'term_number'  => (int) $term,
                     'course_id'    => (int) $courseId,
                 ]);
@@ -82,7 +76,7 @@ class SamplePathController extends Controller
         }
 
         return redirect()
-            ->route('cdc.programmes.sample-path', ['programme' => $programme, 'entry_level' => $entryLevel])
+            ->route('cdc.programmes.sample-path', ['programme' => $programme])
             ->with('success', 'Sample path saved successfully.');
     }
 }

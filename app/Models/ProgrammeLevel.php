@@ -27,6 +27,11 @@ class ProgrammeLevel extends Model
         'is_audit',
     ];
 
+    protected $casts = [
+        'credits_limit' => 'decimal:2',
+        'is_audit' => 'boolean',
+    ];
+
     public function programme(): BelongsTo
     {
         return $this->belongsTo(Programme::class);
@@ -47,7 +52,9 @@ class ProgrammeLevel extends Model
      */
     public function isAudit(): bool
     {
-        return $this->is_audit || in_array($this->level_code, ['Level-0', 'AU', 'Audit']);
+        $code = strtoupper(trim((string) $this->level_code));
+
+        return $this->is_audit || in_array($code, ['LEVEL-0', 'AU', 'AUDIT'], true);
     }
 
     /**

@@ -56,13 +56,19 @@
                     Edit Configuration
                 </a>
                 
-                <form action="{{ route('cdc.schemes.destroy', $scheme) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this scheme?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="text-sm text-red-500 hover:text-red-700" {{ $scheme->programmes_count > 0 ? 'disabled title="Cannot delete scheme with attached programmes"' : '' }}>
+                @if($scheme->programmes_count > 0)
+                    <span class="text-sm text-gray-400 cursor-not-allowed" title="Cannot delete scheme with attached programmes">
                         Delete
-                    </button>
-                </form>
+                    </span>
+                @else
+                    <form action="{{ route('cdc.schemes.destroy', $scheme) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this scheme?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-sm text-red-500 hover:text-red-700">
+                            Delete
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
         @empty

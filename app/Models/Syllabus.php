@@ -46,7 +46,13 @@ class Syllabus extends Model
         'is_part_of_group',
         'training_location',
         'teaching_scheme',
+        'learning_scheme_rows',
+        'learning_scheme_leaf_columns',
+        'learning_scheme_values',
         'examination_scheme',
+        'assessment_scheme_rows',
+        'assessment_scheme_leaf_columns',
+        'assessment_scheme_values',
         'rationale',
         'industry_employer_outcome',
         'course_objectives',
@@ -88,7 +94,13 @@ class Syllabus extends Model
         'approved_at' => 'datetime',
         // New JSON fields
         'teaching_scheme' => 'array',
+        'learning_scheme_rows' => 'array',
+        'learning_scheme_leaf_columns' => 'array',
+        'learning_scheme_values' => 'array',
         'examination_scheme' => 'array',
+        'assessment_scheme_rows' => 'array',
+        'assessment_scheme_leaf_columns' => 'array',
+        'assessment_scheme_values' => 'array',
         'course_objectives' => 'array',
         'course_outcomes' => 'array',
         'units' => 'array',
@@ -431,6 +443,23 @@ class Syllabus extends Model
      */
     public function getTotalMarks(): int
     {
+        if (is_array($this->assessment_scheme_values) && !empty($this->assessment_scheme_values)) {
+            $total = 0;
+            foreach ($this->assessment_scheme_values as $row) {
+                $semanticKey = strtolower(trim((string) ($row['semantic_key'] ?? '')));
+                if ($semanticKey === 'paper_duration' || $semanticKey === 'total_marks' || str_ends_with($semanticKey, '_min')) {
+                    continue;
+                }
+
+                $value = $row['max_marks'] ?? null;
+                if ($value !== null && $value !== '') {
+                    $total += (int) $value;
+                }
+            }
+
+            return $total;
+        }
+
         $scheme = $this->examination_scheme ?? [];
         $total = 0;
         $total += $scheme['fa_th_max'] ?? 0;

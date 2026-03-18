@@ -37,6 +37,20 @@ class Scheme extends Model
         return $this->hasMany(SchemeLearningComponent::class)->orderBy('display_order');
     }
 
+    public function getSyllabusLearningLeafColumns(): array
+    {
+        return $this->getLearningLeafColumns(function (SchemeLearningComponent $leaf) {
+            return $this->isLearningLeafInUsage($leaf, ['course_definition', 'syllabus', 'display_only']);
+        });
+    }
+
+    public function getSyllabusLearningHeaderRows(): array
+    {
+        return $this->getLearningHeaderRows(function (SchemeLearningComponent $leaf) {
+            return $this->isLearningLeafInUsage($leaf, ['course_definition', 'syllabus', 'display_only']);
+        });
+    }
+
     public function getAssessmentTree()
     {
         $components = $this->assessmentComponents()->orderBy('display_order')->get();
@@ -200,6 +214,46 @@ class Scheme extends Model
         });
     }
 
+    public function getSyllabusAssessmentLeafColumns(): array
+    {
+        $root = $this->findTopLevelComponentByName('Assessment Scheme');
+        if (!$root) {
+            return array_values(array_filter($this->getLeafColumns(), function ($leaf) {
+                return $this->isCourseMarksLeafName($leaf['name'] ?? '');
+            }));
+        }
+
+        return $this->getLeafColumnsUnder($root->id, function (SchemeAssessmentComponent $leaf) {
+            return $this->isAssessmentLeafInUsage($leaf, ['course_definition', 'syllabus', 'display_only']);
+        });
+    }
+
+    public function getSyllabusAssessmentHeaderRows(): array
+    {
+        $root = $this->findTopLevelComponentByName('Assessment Scheme');
+        if (!$root) {
+            $leafCols = $this->getSyllabusAssessmentLeafColumns();
+            if (empty($leafCols)) {
+                return [];
+            }
+
+            return [[array_map(function ($leaf) {
+                return [
+                    'id' => $leaf['id'],
+                    'name' => $leaf['name'],
+                    'code' => $leaf['code'] ?? null,
+                    'colspan' => 1,
+                    'rowspan' => 1,
+                    'is_leaf' => true,
+                ];
+            }, $leafCols)]];
+        }
+
+        return $this->getHeaderRowsUnder($root->id, function (SchemeAssessmentComponent $leaf) {
+            return $this->isAssessmentLeafInUsage($leaf, ['course_definition', 'syllabus', 'display_only']);
+        });
+    }
+
     public function getCourseAssessmentHeaderRows(): array
     {
         $root = $this->findTopLevelComponentByName('Assessment Scheme');
@@ -267,10 +321,175 @@ class Scheme extends Model
                     'id' => (int) $c->id,
                     'name' => (string) $c->component_name,
                     'code' => $c->component_code,
+                    'semantic_key' => $c->semantic_key,
+                    'usage_scope' => $c->usage_scope,
+                    'value_kind' => $c->value_kind,
+                    'entry_mode' => $c->entry_mode,
+                    'total_role' => $c->total_role,
+                    'is_input' => (bool) $c->is_input,
+                    'contributes_to_total' => (bool) $c->contributes_to_total,
                 ];
             }
         }
         return $leaves;
+    }
+
+    /**
+     * @param callable|null $leafFilter function(SchemeLearningComponent $leaf): bool
+     * @return array<int, array{id:int,name:string,code:string|null,semantic_key:?string,usage_scope:?string,value_kind:?string}>
+     */
+    private function getLearningLeafColumns(?callable $leafFilter = null): array
+    {
+        $all = $this->learningComponents()->orderBy('display_order')->get();
+        $byParent = $all->groupBy('parent_id');
+        $includedLeafIds = [];
+
+        $walk = function ($parentId) use (&$walk, $byParent, $leafFilter, &$includedLeafIds) {
+            $children = $byParent->get($parentId, collect());
+            foreach ($children as $c) {
+                $grandChildren = $byParent->get($c->id, collect());
+                if ($grandChildren->isEmpty()) {
+                    if (!$leafFilter || (bool) $leafFilter($c)) {
+                        $includedLeafIds[] = (int) $c->id;
+                    }
+                    continue;
+                }
+                $walk($c->id);
+            }
+        };
+
+        $walk(null);
+        if (empty($includedLeafIds)) {
+            return [];
+        }
+
+        $idSet = array_fill_keys($includedLeafIds, true);
+        $leaves = [];
+        foreach ($all as $c) {
+            if (isset($idSet[$c->id])) {
+                $leaves[] = [
+                    'id' => (int) $c->id,
+                    'name' => (string) $c->component_name,
+                    'code' => $c->component_code,
+                    'semantic_key' => $c->semantic_key,
+                    'usage_scope' => $c->usage_scope,
+                    'value_kind' => $c->value_kind,
+                ];
+            }
+        }
+
+        return $leaves;
+    }
+
+    /**
+     * @param callable|null $leafFilter function(SchemeLearningComponent $leaf): bool
+     * @return array<int, array<int, array<string,mixed>>>
+     */
+    private function getLearningHeaderRows(?callable $leafFilter = null): array
+    {
+        $all = $this->learningComponents()->orderBy('display_order')->get();
+        $byParent = $all->groupBy('parent_id');
+        $rows = [[], [], []];
+
+        $countIncludedLeaves = function ($nodeId) use (&$countIncludedLeaves, $byParent, $leafFilter) {
+            $children = $byParent->get($nodeId, collect());
+            if ($children->isEmpty()) {
+                return 0;
+            }
+
+            $sum = 0;
+            foreach ($children as $c) {
+                $grandChildren = $byParent->get($c->id, collect());
+                if ($grandChildren->isEmpty()) {
+                    if (!$leafFilter || (bool) $leafFilter($c)) {
+                        $sum += 1;
+                    }
+                    continue;
+                }
+                $sum += $countIncludedLeaves($c->id);
+            }
+
+            return $sum;
+        };
+
+        foreach ($byParent->get(null, collect()) as $l1) {
+            $leafCount = $countIncludedLeaves($l1->id);
+            $l2Nodes = $byParent->get($l1->id, collect());
+
+            if ($l2Nodes->isEmpty()) {
+                if (!$leafFilter || (bool) $leafFilter($l1)) {
+                    $rows[0][] = [
+                        'id' => (int) $l1->id,
+                        'name' => (string) $l1->component_name,
+                        'code' => $l1->component_code,
+                        'colspan' => 1,
+                        'rowspan' => 3,
+                        'is_leaf' => true,
+                    ];
+                }
+                continue;
+            }
+
+            if ($leafCount <= 0) {
+                continue;
+            }
+
+            $rows[0][] = [
+                'id' => (int) $l1->id,
+                'name' => (string) $l1->component_name,
+                'code' => $l1->component_code,
+                'colspan' => $leafCount,
+                'rowspan' => 1,
+                'is_leaf' => false,
+            ];
+
+            foreach ($l2Nodes as $l2) {
+                $l3Nodes = $byParent->get($l2->id, collect());
+                if ($l3Nodes->isEmpty()) {
+                    if (!$leafFilter || (bool) $leafFilter($l2)) {
+                        $rows[1][] = [
+                            'id' => (int) $l2->id,
+                            'name' => (string) $l2->component_name,
+                            'code' => $l2->component_code,
+                            'colspan' => 1,
+                            'rowspan' => 2,
+                            'is_leaf' => true,
+                        ];
+                    }
+                    continue;
+                }
+
+                $childLeafCount = $countIncludedLeaves($l2->id);
+                if ($childLeafCount <= 0) {
+                    continue;
+                }
+
+                $rows[1][] = [
+                    'id' => (int) $l2->id,
+                    'name' => (string) $l2->component_name,
+                    'code' => $l2->component_code,
+                    'colspan' => $childLeafCount,
+                    'rowspan' => 1,
+                    'is_leaf' => false,
+                ];
+
+                foreach ($l3Nodes as $l3) {
+                    if ($leafFilter && !(bool) $leafFilter($l3)) {
+                        continue;
+                    }
+                    $rows[2][] = [
+                        'id' => (int) $l3->id,
+                        'name' => (string) $l3->component_name,
+                        'code' => $l3->component_code,
+                        'colspan' => 1,
+                        'rowspan' => 1,
+                        'is_leaf' => true,
+                    ];
+                }
+            }
+        }
+
+        return array_values(array_filter($rows, fn ($r) => count($r) > 0));
     }
 
     /**
@@ -379,14 +598,60 @@ class Scheme extends Model
 
     private function isCourseAssessmentInputLeaf(SchemeAssessmentComponent $leaf): bool
     {
+        $usageScope = $leaf->getAttribute('usage_scope');
+        if ($usageScope !== null && trim((string) $usageScope) !== '') {
+            return $usageScope === 'course_definition'
+                && $leaf->getAttribute('value_kind') === 'marks'
+                && (bool) $leaf->getAttribute('is_input')
+                && $leaf->getAttribute('total_role') !== 'derived'
+                && $leaf->getAttribute('semantic_key') !== 'total_marks';
+        }
+
         $valueKind = $leaf->getAttribute('value_kind');
         if ($valueKind !== null) {
             return $valueKind === 'marks'
                 && (bool) $leaf->getAttribute('is_input')
-                && (bool) $leaf->getAttribute('contributes_to_total');
+                && $leaf->getAttribute('total_role') !== 'derived'
+                && $leaf->getAttribute('semantic_key') !== 'total_marks';
         }
 
         return $this->isCourseMarksLeafName((string) $leaf->component_name);
+    }
+
+    private function isAssessmentLeafInUsage(SchemeAssessmentComponent $leaf, array $usages): bool
+    {
+        $usageScope = trim((string) ($leaf->getAttribute('usage_scope') ?? ''));
+        if ($usageScope !== '') {
+            return in_array($usageScope, $usages, true);
+        }
+
+        return $this->isCourseAssessmentInputLeaf($leaf);
+    }
+
+    private function isLearningLeafInUsage(SchemeLearningComponent $leaf, array $usages): bool
+    {
+        $usageScope = trim((string) ($leaf->getAttribute('usage_scope') ?? ''));
+        if ($usageScope !== '') {
+            return in_array($usageScope, $usages, true);
+        }
+
+        return $this->inferLearningSemanticKey((string) $leaf->component_name) !== null;
+    }
+
+    public function inferLearningSemanticKey(string $name): ?string
+    {
+        $n = mb_strtolower(trim($name));
+
+        return match (true) {
+            $n === 'credits' => 'credits',
+            $n === 'cl' || str_contains($n, 'classroom') => 'th_hours',
+            $n === 'tu' || str_contains($n, 'tutorial') => 'tu_hours',
+            $n === 'll' || $n === 'practical' || str_contains($n, 'laboratory') => 'pr_hours',
+            str_contains($n, 'self learning') || str_contains($n, 'slh') => 'slh_hours',
+            str_contains($n, 'notional') || str_contains($n, 'nlh') => 'nlh_hours',
+            str_contains($n, 'total learning') || str_contains($n, 'total hrs') => 'total_hours',
+            default => null,
+        };
     }
 
     private function findTopLevelComponentByName(string $name): ?SchemeAssessmentComponent

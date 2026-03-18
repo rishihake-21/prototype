@@ -10,6 +10,8 @@ class SamplePath extends Model
 {
     use HasFactory;
 
+    public const ENTRY_LEVEL_STANDARD = 'standard';
+
     protected $fillable = [
         'programme_id',
         'entry_level',
@@ -42,5 +44,10 @@ class SamplePath extends Model
             6 => 'Even - 3rd Year',
         ];
         return $labels[$term] ?? "Term $term";
+    }
+
+    public static function canonicalEntryLevels(): array
+    {
+        return [self::ENTRY_LEVEL_STANDARD, '10+', '12+', 'Lateral'];
     }
 }

@@ -152,6 +152,15 @@ class DashboardController extends Controller
         // filters by status and associated departments.
         $pendingQuery = Syllabus::query()->forApprover($user);
 
+        $departmentIds = $user->isAdmin()
+            ? \App\Models\Department::pluck('id')->all()
+            : collect([$user->headedDepartment?->id])
+                ->merge($user->departments()->pluck('departments.id'))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
         $stats = [
             'pending' => $pendingQuery->count(),
             'approved_this_month' => $user->reviews()
@@ -163,6 +172,11 @@ class DashboardController extends Controller
                 ->whereMonth('review_date', now()->month)
                 ->count(),
             'unread_handoffs' => $user->notifications()->whereIn('type', $this->handoffTypes())->unread()->count(),
+            'active_assignments' => empty($departmentIds)
+                ? 0
+                : CourseAssignment::whereIn('department_id', $departmentIds)
+                    ->whereIn('status', CourseAssignment::activeStatuses())
+                    ->count(),
         ];
 
         $reviewQueue = Syllabus::query()
@@ -178,6 +192,17 @@ class DashboardController extends Controller
             ->take(6)
             ->get();
 
-        return view('dashboard.approver', compact('stats', 'reviewQueue', 'handoffs'));
+        $assignments = empty($departmentIds)
+            ? collect()
+            : CourseAssignment::whereIn('department_id', $departmentIds)
+                ->whereIn('status', CourseAssignment::activeStatuses())
+                ->with(['course.programme', 'course.level', 'department', 'faculty', 'syllabi' => fn ($query) => $query->latest()])
+                ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('deadline')
+                ->latest('updated_at')
+                ->take(10)
+                ->get();
+
+        return view('dashboard.approver', compact('stats', 'reviewQueue', 'handoffs', 'assignments'));
     }
 }

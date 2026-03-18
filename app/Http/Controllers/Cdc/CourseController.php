@@ -10,6 +10,7 @@ use App\Models\Programme;
 use App\Models\ProgrammeLevel;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -74,27 +75,17 @@ class CourseController extends Controller
             : null;
         $this->validateLevelCapacity($programme, $data);
 
-        if ($request->has('assessment_marks')) {
-            $this->guardAssessmentKeys($programme, $request->input('assessment_marks', []));
+        $assessmentMarks = $this->normalizeAssessmentMarks($data['assessment_marks'] ?? null);
+        if ($assessmentMarks !== null) {
+            $this->guardAssessmentKeys($programme, $assessmentMarks);
         }
 
-        $course = $programme->courses()->create($data);
+        $course = DB::transaction(function () use ($programme, $data, $assessmentMarks) {
+            $course = $programme->courses()->create($data);
+            $this->syncAssessmentMarks($course, $assessmentMarks);
 
-        if ($request->has('assessment_marks')) {
-            $totalMarks = 0;
-            foreach ($request->input('assessment_marks') as $compId => $marks) {
-                if (is_null($marks) || trim($marks) === '') continue; // Skip empty entries
-                
-                $course->assessments()->create([
-                    'component_id' => $compId,
-                    'max_marks'    => $marks,
-                    'min_marks'    => 0 // Default or handle later
-                ]);
-                $totalMarks += (int) $marks;
-            }
-            // Update the stored total marks
-            $course->update(['total_marks' => $totalMarks]);
-        }
+            return $course;
+        });
 
         // Sync departments for common courses
         if ($course->is_common_course && $request->filled('departments')) {
@@ -119,7 +110,8 @@ class CourseController extends Controller
         ]);
         $course->load('departments', 'assessments');
 
-        $existingMarks = $course->assessments->pluck('max_marks', 'component_id')->toArray();
+        $leafCols = $programme->scheme?->getCourseAssessmentLeafColumns() ?? [];
+        $existingMarks = $this->buildAssessmentFormValues($course, $leafCols);
 
         return view('cdc.courses.form', [
             'programme'      => $programme,
@@ -128,7 +120,7 @@ class CourseController extends Controller
             'electiveGroups' => Course::electiveGroups(),
             'departments'    => Department::orderBy('name')->get(),
             'schemeRows'     => $programme->scheme?->getCourseAssessmentHeaderRows() ?? [],
-            'leafCols'       => $programme->scheme?->getCourseAssessmentLeafColumns() ?? [],
+            'leafCols'       => $leafCols,
             'marks'          => old('assessment_marks', $existingMarks),
             'levelStats'     => $this->buildLevelStats($programme, $course),
             'selectedLevelId' => old('level_id', $course->level_id),
@@ -144,28 +136,15 @@ class CourseController extends Controller
             : null;
         $this->validateLevelCapacity($programme, $data, $course);
 
-        if ($request->has('assessment_marks')) {
-            $this->guardAssessmentKeys($programme, $request->input('assessment_marks', []));
+        $assessmentMarks = $this->normalizeAssessmentMarks($data['assessment_marks'] ?? null);
+        if ($assessmentMarks !== null) {
+            $this->guardAssessmentKeys($programme, $assessmentMarks);
         }
 
-        $course->update($data);
-
-        if ($request->has('assessment_marks')) {
-            $course->assessments()->delete();
-            $totalMarks = 0;
-             
-            foreach ($request->input('assessment_marks') as $compId => $marks) {
-                if (is_null($marks) || trim($marks) === '') continue; // Skip empty entries
-                
-                $course->assessments()->create([
-                    'component_id' => $compId,
-                    'max_marks'    => $marks,
-                    'min_marks'    => 0
-                ]);
-                $totalMarks += (int) $marks;
-            }
-            $course->update(['total_marks' => $totalMarks]);
-        }
+        DB::transaction(function () use ($course, $data, $assessmentMarks) {
+            $course->update($data);
+            $this->syncAssessmentMarks($course, $assessmentMarks);
+        });
 
         // Sync departments
         if ($course->is_common_course && $request->filled('departments')) {
@@ -199,16 +178,33 @@ class CourseController extends Controller
 
     public function clone(Request $request, Course $course)
     {
-        $clone = $course->replicate();
-        $clone->course_code  = $course->course_code . '-COPY';
-        $clone->course_title = $course->course_title . ' (Copy)';
-        $clone->deleted_at   = null;
-        $clone->save();
+        $clone = DB::transaction(function () use ($course) {
+            $clone = $course->replicate();
+            $clone->course_code  = $course->course_code . '-COPY';
+            $clone->course_title = $course->course_title . ' (Copy)';
+            $clone->deleted_at   = null;
+            $clone->save();
 
-        // Copy department links
-        if ($course->is_common_course) {
-            $clone->departments()->sync($course->departments->pluck('id'));
-        }
+            $course->loadMissing('assessments');
+            $payload = $course->assessments->map(function ($assessment) {
+                return [
+                    'component_id' => $assessment->component_id,
+                    'max_marks' => is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : 0,
+                    'min_marks' => is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : 0,
+                ];
+            })->all();
+
+            if (!empty($payload)) {
+                $clone->assessments()->createMany($payload);
+            }
+            $clone->update(['total_marks' => (int) $course->total_marks]);
+
+            if ($course->is_common_course) {
+                $clone->departments()->sync($course->departments->pluck('id'));
+            }
+
+            return $clone;
+        });
 
         return redirect()
             ->route('cdc.courses.edit', [$course->programme_id, $clone])
@@ -259,8 +255,8 @@ class CourseController extends Controller
             'th_hours'           => 'required|integer|min:0|max:40',
             'tu_hours'           => 'required|integer|min:0|max:40',
             'pr_hours'           => 'required|integer|min:0|max:60',
-            // Credits should be small. Prevent obvious data-entry mistakes (e.g. marks typed into credits).
-            'credits'            => 'required|numeric|min:0|max:20',
+            // Credits are controlled by Scheme at a Glance; use whole-number steps.
+            'credits'            => 'required|numeric|min:0|multiple_of:1',
             'theory_paper_hrs'   => 'required|numeric|min:0|max:6',
             'course_type'        => 'required|in:compulsory,elective,audit',
             'assessment_marks'   => 'nullable|array',
@@ -390,7 +386,7 @@ class CourseController extends Controller
         $errors = [];
         $offered = (int) $stats['offered'];
         $courseMarks = isset($data['assessment_marks']) && is_array($data['assessment_marks'])
-            ? $this->sumAssessmentMarks($data['assessment_marks'])
+            ? $this->sumAssessmentMarks($data['assessment_marks'], $this->getAssessmentComponentMeta($programme))
             : 0;
         $newTotalHours = (int) $data['th_hours'] + (int) $data['tu_hours'] + (int) $data['pr_hours'];
 
@@ -438,9 +434,11 @@ class CourseController extends Controller
             $errors['th_hours'] = "Total hours limit exceeded for {$level->level_code}. Allowed total is {$hoursLimit}.";
         }
 
-        $creditsLimit = (float) $stats['credits_limit'];
-        if ($creditsLimit > 0 && ((float) $stats['credits_used'] + (float) $data['credits']) > $creditsLimit) {
-            $errors['credits'] = "Credits limit exceeded for {$level->level_code}. Allowed total is {$creditsLimit}.";
+        $creditsLimit = round((float) $stats['credits_limit'], 2);
+        $creditsUsed = round((float) $stats['credits_used'], 2);
+        $newCreditsTotal = round($creditsUsed + (float) $data['credits'], 2);
+        if ($creditsLimit > 0 && $newCreditsTotal > $creditsLimit) {
+            $errors['credits'] = "Credits limit exceeded for {$level->level_code}. Allowed total is ".number_format($creditsLimit, 2).".";
         }
 
         $marksLimit = (int) $stats['marks_limit'];
@@ -452,10 +450,11 @@ class CourseController extends Controller
             $errors['credits'] = 'Credits cannot be greater than 0 when TH, TU, and PR are all 0.';
         }
 
+        if (($data['course_type'] ?? null) !== Course::TYPE_AUDIT && (float) $data['credits'] <= 0.0) {
+            $errors['credits'] = 'Credits must be greater than 0 for non-audit courses.';
+        }
+
         if (($data['course_type'] ?? null) === Course::TYPE_AUDIT) {
-            if ((float) $data['credits'] !== 0.0) {
-                $errors['credits'] = 'Audit courses must have 0 credits.';
-            }
             if ($courseMarks > 0) {
                 $errors['assessment_marks'] = 'Audit courses should not have assessment marks.';
             }
@@ -469,11 +468,15 @@ class CourseController extends Controller
     /**
      * @param array<mixed> $assessmentMarks
      */
-    private function sumAssessmentMarks(array $assessmentMarks): int
+    private function sumAssessmentMarks(array $assessmentMarks, array $componentMeta = []): int
     {
         $total = 0;
-        foreach ($assessmentMarks as $marks) {
+        foreach ($assessmentMarks as $componentId => $marks) {
             if ($marks === null || $marks === '') {
+                continue;
+            }
+
+            if (!$this->componentCountsTowardTotal($componentMeta[(int) $componentId] ?? null)) {
                 continue;
             }
 
@@ -481,6 +484,185 @@ class CourseController extends Controller
         }
 
         return $total;
+    }
+
+    /**
+     * @param array<mixed>|null $assessmentMarks
+     * @return array<int, int>|null
+     */
+    private function normalizeAssessmentMarks(?array $assessmentMarks): ?array
+    {
+        if ($assessmentMarks === null) {
+            return null;
+        }
+
+        $normalized = [];
+        foreach ($assessmentMarks as $componentId => $marks) {
+            if (!is_numeric($componentId)) {
+                continue;
+            }
+
+            if ($marks === null || trim((string) $marks) === '') {
+                continue;
+            }
+
+            $normalized[(int) $componentId] = (int) $marks;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int, int>|null $assessmentMarks
+     */
+    private function syncAssessmentMarks(Course $course, ?array $assessmentMarks): void
+    {
+        $course->assessments()->delete();
+
+        if (empty($assessmentMarks)) {
+            $course->update(['total_marks' => 0]);
+            return;
+        }
+
+        $payload = [];
+        $componentMeta = $this->getAssessmentComponentMeta($course->programme);
+        $totalMarks = 0;
+
+        foreach ($assessmentMarks as $componentId => $marks) {
+            $meta = $componentMeta[(int) $componentId] ?? null;
+            if (!$this->shouldPersistAssessmentComponent($meta)) {
+                continue;
+            }
+
+            $isMinPass = $this->componentStoresMinMarks($meta);
+            if ($this->componentCountsTowardTotal($meta)) {
+                $totalMarks += (int) $marks;
+            }
+
+            $payload[] = [
+                'component_id' => $componentId,
+                'max_marks' => $isMinPass ? 0 : $marks,
+                'min_marks' => $isMinPass ? $marks : 0,
+            ];
+        }
+
+        if (!empty($payload)) {
+            $course->assessments()->createMany($payload);
+        }
+
+        $course->update(['total_marks' => $totalMarks]);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $leafCols
+     * @return array<int, int>
+     */
+    private function buildAssessmentFormValues(Course $course, array $leafCols): array
+    {
+        $course->loadMissing('assessments');
+        $byComponent = $course->assessments->keyBy('component_id');
+        $values = [];
+
+        foreach ($leafCols as $leaf) {
+            $assessment = $byComponent->get((int) ($leaf['id'] ?? 0));
+            if (!$assessment) {
+                continue;
+            }
+
+            if ($this->componentStoresMinMarks($leaf)) {
+                $value = is_numeric($assessment->min_marks)
+                    ? (int) $assessment->min_marks
+                    : (is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null);
+            } else {
+                $value = is_numeric($assessment->max_marks)
+                    ? (int) $assessment->max_marks
+                    : (is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null);
+            }
+
+            if ($value !== null) {
+                $values[(int) $leaf['id']] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return array<int, array{semantic_key:?string,total_role:?string,entry_mode:?string,contributes_to_total:bool}>
+     */
+    private function getAssessmentComponentMeta(Programme $programme): array
+    {
+        $programme->loadMissing('scheme.assessmentComponents');
+
+        $components = $programme->scheme?->assessmentComponents ?? collect();
+        $meta = [];
+
+        foreach ($components as $component) {
+            $meta[(int) $component->id] = [
+                'semantic_key' => $component->semantic_key,
+                'total_role' => $component->total_role,
+                'entry_mode' => $component->entry_mode,
+                'contributes_to_total' => (bool) $component->contributes_to_total,
+            ];
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @param array<string, mixed>|null $meta
+     */
+    private function componentCountsTowardTotal(?array $meta): bool
+    {
+        if ($meta === null) {
+            return true;
+        }
+
+        $semanticKey = (string) ($meta['semantic_key'] ?? '');
+        $totalRole = (string) ($meta['total_role'] ?? '');
+
+        if ($semanticKey === 'total_marks' || str_ends_with($semanticKey, '_min') || $semanticKey === 'min_marks') {
+            return false;
+        }
+
+        if (in_array($totalRole, ['derived', 'min_pass', 'informational'], true)) {
+            return false;
+        }
+
+        return (bool) ($meta['contributes_to_total'] ?? true);
+    }
+
+    /**
+     * @param array<string, mixed>|null $meta
+     */
+    private function componentStoresMinMarks(?array $meta): bool
+    {
+        $semanticKey = (string) ($meta['semantic_key'] ?? '');
+        $totalRole = (string) ($meta['total_role'] ?? '');
+
+        return $totalRole === 'min_pass'
+            || $semanticKey === 'min_marks'
+            || str_ends_with($semanticKey, '_min');
+    }
+
+    /**
+     * @param array<string, mixed>|null $meta
+     */
+    private function shouldPersistAssessmentComponent(?array $meta): bool
+    {
+        if ($meta === null) {
+            return true;
+        }
+
+        $semanticKey = (string) ($meta['semantic_key'] ?? '');
+        $entryMode = (string) ($meta['entry_mode'] ?? '');
+        $totalRole = (string) ($meta['total_role'] ?? '');
+
+        if ($semanticKey === 'total_marks' || $totalRole === 'derived' || $entryMode === 'readonly') {
+            return false;
+        }
+
+        return true;
     }
 
     private function notifyHodsForElectivePool(Course $course, string $action): void
@@ -566,12 +748,16 @@ class CourseController extends Controller
             $course->setAttribute($k, $v);
         }
 
-        $course->setAttribute('assessment_scheme_rows', $course->programme?->scheme?->getCourseAssessmentHeaderRows() ?? []);
-        $course->setAttribute('assessment_scheme_leaf_columns', $course->programme?->scheme?->getCourseAssessmentLeafColumns() ?? []);
+        $course->setAttribute('learning_scheme_rows', $course->programme?->scheme?->getSyllabusLearningHeaderRows() ?? []);
+        $course->setAttribute('learning_scheme_leaf_columns', $course->programme?->scheme?->getSyllabusLearningLeafColumns() ?? []);
+        $course->setAttribute('learning_scheme_values', $this->buildLearningSchemeValues($course));
+        $course->setAttribute('assessment_scheme_rows', $course->programme?->scheme?->getSyllabusAssessmentHeaderRows() ?? []);
+        $course->setAttribute('assessment_scheme_leaf_columns', $course->programme?->scheme?->getSyllabusAssessmentLeafColumns() ?? []);
         $course->setAttribute('assessment_scheme_values', $course->assessments->map(function ($assessment) {
             return [
                 'component_id' => (int) $assessment->component_id,
                 'component_name' => $assessment->component?->component_name,
+                'semantic_key' => $assessment->component?->semantic_key,
                 'max_marks' => is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null,
                 'min_marks' => is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null,
             ];
@@ -598,9 +784,45 @@ class CourseController extends Controller
 
         foreach ($course->assessments as $a) {
             $name = strtolower(trim((string) ($a->component?->component_name ?? '')));
+            $semanticKey = strtolower(trim((string) ($a->component?->semantic_key ?? '')));
             $max = is_numeric($a->max_marks) ? (int) $a->max_marks : null;
             if ($max === null) {
                 continue;
+            }
+
+            if ($semanticKey !== '') {
+                if ($semanticKey === 'fa_th_max' && $out['test_max_marks'] === null) {
+                    $out['test_max_marks'] = $max;
+                    continue;
+                }
+                if ($semanticKey === 'fa_th_min' && $out['test_min_marks'] === null) {
+                    $out['test_min_marks'] = is_numeric($a->min_marks) ? (int) $a->min_marks : $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_th_max' && $out['theory_max_marks'] === null) {
+                    $out['theory_max_marks'] = $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_th_min' && $out['theory_min_marks'] === null) {
+                    $out['theory_min_marks'] = is_numeric($a->min_marks) ? (int) $a->min_marks : $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_pr_max' && $out['pr_max_marks'] === null) {
+                    $out['pr_max_marks'] = $max;
+                    continue;
+                }
+                if ($semanticKey === 'sa_pr_min' && $out['pr_min_marks'] === null) {
+                    $out['pr_min_marks'] = is_numeric($a->min_marks) ? (int) $a->min_marks : $max;
+                    continue;
+                }
+                if ($semanticKey === 'oral_max' && $out['or_max_marks'] === null) {
+                    $out['or_max_marks'] = $max;
+                    continue;
+                }
+                if (in_array($semanticKey, ['tw_max', 'sla_max'], true) && $out['tw_max_marks'] === null) {
+                    $out['tw_max_marks'] = $max;
+                    continue;
+                }
             }
 
             if (($out['test_max_marks'] === null) && str_contains($name, 'fa-th') && str_contains($name, 'max')) {
@@ -638,5 +860,37 @@ class CourseController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * @return array<int, array{component_id:int,component_name:?string,semantic_key:?string,value:int|float|null}>
+     */
+    private function buildLearningSchemeValues(Course $course): array
+    {
+        $leafColumns = $course->programme?->scheme?->getSyllabusLearningLeafColumns() ?? [];
+        $values = [];
+
+        foreach ($leafColumns as $leaf) {
+            $semanticKey = $leaf['semantic_key'] ?? $course->programme?->scheme?->inferLearningSemanticKey((string) ($leaf['name'] ?? ''));
+            $value = match ($semanticKey) {
+                'th_hours' => (int) $course->th_hours,
+                'tu_hours' => (int) $course->tu_hours,
+                'pr_hours' => (int) $course->pr_hours,
+                'total_hours' => (int) $course->total_hours,
+                'credits' => is_numeric($course->credits) ? (float) $course->credits : null,
+                'slh_hours' => 0,
+                'nlh_hours' => (int) $course->total_hours,
+                default => null,
+            };
+
+            $values[] = [
+                'component_id' => (int) $leaf['id'],
+                'component_name' => $leaf['name'] ?? null,
+                'semantic_key' => $semanticKey,
+                'value' => $value,
+            ];
+        }
+
+        return $values;
     }
 }

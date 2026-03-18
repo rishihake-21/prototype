@@ -8,6 +8,7 @@ use App\Models\CourseAssignment;
 use App\Models\Programme;
 use App\Models\ProgrammeLevel;
 use App\Models\ProgrammeStructure;
+use App\Models\SamplePath;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -162,10 +163,17 @@ class ProgrammeController extends Controller
             'scheme',
             'creator',
             'levels.structure',
-            'courses' => fn ($query) => $query->with(['level', 'departments'])->orderBy('course_code'),
+            'courses' => fn ($query) => $query->with(['level', 'departments', 'assessments.component'])->orderBy('course_code'),
+            'awardClassCourses.course.level',
+            'awardClassCourses.course.assessments.component',
         ]);
 
         $courses = $programme->courses;
+        $samplePaths = $programme->samplePaths()
+            ->with('course.level')
+            ->orderBy('entry_level')
+            ->orderBy('term_number')
+            ->get();
 
         $electiveAssignments = CourseAssignment::with(['course.level', 'department'])
             ->where('academic_year', $programme->academic_year)
@@ -206,16 +214,22 @@ class ProgrammeController extends Controller
                         'course' => $course,
                         'availability' => $availability,
                         'selected_by' => $selectedBy,
+                        'assessment_marks' => $course->assessments->pluck('max_marks', 'component_id'),
                     ];
                 });
 
             $electiveRows = $rows->filter(fn (array $row) => $row['course']->course_type === Course::TYPE_ELECTIVE)->values();
             $selectedElectiveRows = $electiveRows->filter(fn (array $row) => $row['selected_by']->isNotEmpty())->values();
+            $compulsoryRows = $rows->filter(fn (array $row) => $row['course']->course_type === Course::TYPE_COMPULSORY)->values();
+            $auditRows = $rows->filter(fn (array $row) => $row['course']->course_type === Course::TYPE_AUDIT)->values();
 
             return [
                 'level' => $level,
                 'structure' => $structure,
                 'courses' => $rows,
+                'compulsory_courses' => $compulsoryRows,
+                'elective_courses' => $electiveRows,
+                'audit_courses' => $auditRows,
                 'defined_courses' => $rows->count(),
                 'offered_courses' => (int) ($structure?->total_courses_offered ?? 0),
                 'elective_pool_defined' => $electiveRows->count(),
@@ -251,12 +265,47 @@ class ProgrammeController extends Controller
             'marks' => $courses->sum('total_marks'),
         ];
 
+        $samplePathSections = $samplePaths
+            ->groupBy('term_number')
+            ->sortKeys()
+            ->map(function ($termRows, $termNumber) {
+                $sorted = $termRows
+                    ->sortBy(fn (SamplePath $path) => sprintf(
+                        '%02d-%s-%s',
+                        match ($path->course?->course_type) {
+                            Course::TYPE_COMPULSORY => 0,
+                            Course::TYPE_ELECTIVE => 1,
+                            default => 2,
+                        },
+                        $path->course?->elective_group ?? '',
+                        $path->course?->course_code ?? ''
+                    ))
+                    ->values();
+
+                return [
+                    'term_number' => (int) $termNumber,
+                    'term_label' => SamplePath::termLabel((int) $termNumber),
+                    'compulsory' => $sorted->filter(fn (SamplePath $path) => $path->course?->course_type === Course::TYPE_COMPULSORY)->values(),
+                    'elective' => $sorted->filter(fn (SamplePath $path) => $path->course?->course_type === Course::TYPE_ELECTIVE)->values(),
+                    'audit' => $sorted->filter(fn (SamplePath $path) => $path->course?->course_type === Course::TYPE_AUDIT)->values(),
+                ];
+            })
+            ->values();
+
+        $awardClassCourses = $programme->awardClassCourses
+            ->filter(fn ($item) => $item->course !== null)
+            ->sortBy('sort_order')
+            ->values();
+
         return [
             'programme' => $programme,
             'institutionName' => config('sms.institution_name', 'Institution Name'),
             'levelSections' => $levelSections,
             'structureTotals' => $structureTotals,
             'courseTotals' => $courseTotals,
+            'samplePathSections' => $samplePathSections,
+            'awardClassCourses' => $awardClassCourses,
+            'assessmentLeafColumns' => collect($programme->scheme?->getCourseAssessmentLeafColumns() ?? []),
         ];
     }
 }

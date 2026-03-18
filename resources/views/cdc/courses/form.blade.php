@@ -165,7 +165,7 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Credits <span class="text-red-500">*</span></label>
                     <input type="number" name="credits"
-                           value="{{ old('credits', $course?->credits ?? 0) }}" min="0" step="0.5"
+                           value="{{ old('credits', $course?->credits ?? 0) }}" min="0" step="1"
                            class="w-full text-center rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('credits') border-red-400 @enderror">
                     @error('credits')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
@@ -216,7 +216,7 @@
                             <tr>
                                 @foreach($leafCols as $leaf)
                                     <td class="px-2 py-3 border-r border-gray-200 text-center hover:bg-indigo-50/30 transition">
-                                        <input type="number" name="assessment_marks[{{ $leaf['id'] }}]"
+                                       <input type="number" name="assessment_marks[{{ $leaf['id'] }}]"
                                                x-model.number="marks[{{ $leaf['id'] }}]" min="0" placeholder="0"
                                                class="w-full min-w-[60px] max-w-[80px] text-center rounded border-gray-300 text-xs py-1.5 focus:ring-2 focus:ring-indigo-500 mx-auto">
                                     </td>
@@ -234,7 +234,7 @@
                     </div>
                 </div>
 
-                <p class="mt-2 text-xs text-gray-400 text-right">Total marks are calculated automatically from the max-mark leaf values.</p>
+                <p class="mt-2 text-xs text-gray-400 text-right">Total marks are calculated automatically only from total-contributing assessment columns.</p>
                 <p class="mt-1 text-xs text-gray-500 text-right">The course will be blocked if this pushes the level above its total marks limit.</p>
             @endif
         </div>
@@ -325,6 +325,7 @@ function courseForm() {
         tu: {{ old('tu_hours', $course?->tu_hours ?? 0) }},
         pr: {{ old('pr_hours', $course?->pr_hours ?? 0) }},
         marks: @json($marks ?? []),
+        leafCols: @json($leafCols ?? []),
         levelStats: @json($levelStats),
         selectedLevel: '{{ $selectedLevelId }}',
         courseType: '{{ old('course_type', $course?->course_type ?? 'compulsory') }}',
@@ -333,7 +334,13 @@ function courseForm() {
             return this.levelStats[this.selectedLevel] || {};
         },
         get totalMarks() {
-            return Object.values(this.marks).reduce((acc, val) => acc + (Number(val) || 0), 0);
+            return this.leafCols.reduce((acc, leaf) => {
+                if (!this.countsTowardTotal(leaf)) {
+                    return acc;
+                }
+
+                return acc + (Number(this.marks[leaf.id]) || 0);
+            }, 0);
         },
         init() {
             // Ensure all columns exist in marks object for reactivity
@@ -342,6 +349,20 @@ function courseForm() {
                     this.marks[{{ $leaf['id'] }}] = null;
                 }
             @endforeach
+        },
+        countsTowardTotal(leaf) {
+            const semanticKey = String(leaf.semantic_key || '');
+            const totalRole = String(leaf.total_role || '');
+
+            if (semanticKey === 'total_marks' || semanticKey === 'min_marks' || semanticKey.endsWith('_min')) {
+                return false;
+            }
+
+            if (['derived', 'min_pass', 'informational'].includes(totalRole)) {
+                return false;
+            }
+
+            return Boolean(leaf.contributes_to_total ?? true);
         },
     };
 }

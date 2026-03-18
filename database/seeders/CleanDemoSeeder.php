@@ -3,11 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Department;
-use App\Models\Programme;
 use App\Models\User;
-use App\Models\Course;
-use App\Models\CourseAssignment;
-use App\Models\GlobalLevel;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -86,105 +82,6 @@ class CleanDemoSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
 
-        // 6. Seed K-Scheme
-        $scheme = \App\Models\Scheme::firstOrCreate(
-        ['name' => 'K-Scheme'],
-        [
-            'implemented_year' => 2026,
-            'description' => 'latest scheme.',
-            'is_active' => true,
-        ]
-        );
-
-        // Seed K-Scheme levels
-        $kLevels = [
-            ['level_code' => '1', 'level_name' => 'basic', 'sort_order' => 1],
-            ['level_code' => '2', 'level_name' => 'Foundation', 'sort_order' => 2],
-            ['level_code' => '3', 'level_name' => 'Allied Courses', 'sort_order' => 3],
-            ['level_code' => '4', 'level_name' => 'Applied Courses', 'sort_order' => 4],
-            ['level_code' => '5', 'level_name' => 'Diversified Courses', 'sort_order' => 5],
-            ['level_code' => 'Au', 'level_name' => 'Audit Courses', 'sort_order' => 6],
-
-        ];
-
-        foreach ($kLevels as $levelData) {
-            $scheme->levels()->firstOrCreate(
-            ['level_code' => $levelData['level_code']],
-            ['level_name' => $levelData['level_name'], 'sort_order' => $levelData['sort_order']]
-            );
-        }
-
-        // Seed K-Scheme components split into Learning vs Assessment
-        $learningStructure = [
-            [
-                'name' => 'Learning Scheme',
-                'children' => [
-                    ['name' => 'Actual Contact Hours / Week', 'columns' => ['CL', 'TL', 'LL', 'Practical']],
-                    ['name' => 'Self Learning (Activity / Assignment / Micro Project)', 'columns' => []],
-                    ['name' => 'Notional Learning Hours / Week', 'columns' => []],
-                ]
-            ],
-            [
-                'name' => 'Credits',
-                'children' => [],
-            ],
-        ];
-
-        $assessmentStructure = [
-            [
-                'name' => 'Assessment Scheme',
-                'children' => [
-                    ['name' => 'Paper Duration', 'columns' => []],
-                    ['name' => 'Theory', 'columns' => ['FA-TH (Max)', 'SA-TH (Max)', 'Total (TH)', 'Min (TH)']],
-                    ['name' => 'Practical', 'columns' => ['FA-PR (Max)', 'SA-PR (Max)', 'Total (PR)', 'Min (PR)']],
-                    ['name' => 'SLA', 'columns' => ['Max (SLA)', 'Min (SLA)']],
-                ]
-            ]
-        ];
-
-        $displayOrder = 0;
-
-        foreach ($learningStructure as $l1) {
-            $l1Node = $scheme->learningComponents()->firstOrCreate(
-                ['component_code' => \Illuminate\Support\Str::slug($l1['name']), 'parent_id' => null],
-                ['component_name' => $l1['name'], 'display_order' => $displayOrder++]
-            );
-
-            foreach (($l1['children'] ?? []) as $l2) {
-                $l2Node = $scheme->learningComponents()->firstOrCreate(
-                    ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name']), 'parent_id' => $l1Node->id],
-                    ['component_name' => $l2['name'], 'display_order' => $displayOrder++]
-                );
-
-                foreach (($l2['columns'] ?? []) as $colName) {
-                    $scheme->learningComponents()->firstOrCreate(
-                        ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name'] . ' ' . $colName), 'parent_id' => $l2Node->id],
-                        ['component_name' => $colName, 'display_order' => $displayOrder++]
-                    );
-                }
-            }
-        }
-
-        foreach ($assessmentStructure as $l1) {
-            $l1Node = $scheme->assessmentComponents()->firstOrCreate(
-                ['component_code' => \Illuminate\Support\Str::slug($l1['name']), 'parent_id' => null],
-                ['component_name' => $l1['name'], 'display_order' => $displayOrder++]
-            );
-
-            foreach (($l1['children'] ?? []) as $l2) {
-                $l2Node = $scheme->assessmentComponents()->firstOrCreate(
-                    ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name']), 'parent_id' => $l1Node->id],
-                    ['component_name' => $l2['name'], 'display_order' => $displayOrder++]
-                );
-
-                foreach (($l2['columns'] ?? []) as $colName) {
-                    $scheme->assessmentComponents()->firstOrCreate(
-                        ['component_code' => \Illuminate\Support\Str::slug($l1['name'] . ' ' . $l2['name'] . ' ' . $colName), 'parent_id' => $l2Node->id],
-                        ['component_name' => $colName, 'display_order' => $displayOrder++]
-                    );
-                }
-            }
-        }
+        $this->call(MsbteKSchemeSeeder::class);
     }
-
 }

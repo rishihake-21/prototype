@@ -42,8 +42,24 @@ class ProgrammeStructureController extends Controller
             $th         = (int) ($data['th_hours']              ?? 0);
             $tu         = (int) ($data['tu_hours']              ?? 0);
             $pr         = (int) ($data['pr_hours']              ?? 0);
-            $credits    = (float) ($data['total_credits']       ?? 0);
+            $credits    = round((float) ($data['total_credits'] ?? 0), 2);
             $marks      = (int) ($data['total_marks']           ?? 0);
+
+            if ($level->isAudit()) {
+                $credits = 0.0;
+                $marks = 0;
+            }
+
+            if ($credits < 0) {
+                $errors[] = "Level {$level->level_code}: total credits cannot be negative.";
+                continue;
+            }
+
+            $scaledCredits = (int) round($credits * 100);
+            if ($scaledCredits % 100 !== 0) {
+                $errors[] = "Level {$level->level_code}: total credits must be entered in whole numbers.";
+                continue;
+            }
 
             if ($toComplete > $offered) {
                 $errors[] = "Level {$level->level_code}: 'Courses to Complete' ({$toComplete}) cannot exceed 'Total Courses Offered' ({$offered}).";

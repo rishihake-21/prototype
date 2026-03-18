@@ -11,13 +11,35 @@
 
         $l1 = $nodes->where('parent_id', null);
         foreach ($l1 as $n1) {
+            if (collect($out)->contains(fn ($row) => ($row['name'] ?? null) === $n1->component_name)) {
+                continue;
+            }
+
             $l1Data = ['name' => $n1->component_name, 'children' => []];
             $l2 = $nodes->where('parent_id', $n1->id);
             foreach ($l2 as $n2) {
+                if (collect($l1Data['children'])->contains(fn ($row) => ($row['name'] ?? null) === $n2->component_name)) {
+                    continue;
+                }
+
                 $l2Data = ['name' => $n2->component_name, 'columns' => []];
                 $l3 = $nodes->where('parent_id', $n2->id);
                 foreach ($l3 as $n3) {
-                    $l2Data['columns'][] = $n3->component_name;
+                    if (collect($l2Data['columns'])->contains(function ($col) use ($n3) {
+                        return is_array($col)
+                            ? (($col['name'] ?? null) === $n3->component_name)
+                            : ($col === $n3->component_name);
+                    })) {
+                        continue;
+                    }
+
+                    $l2Data['columns'][] = [
+                        'name' => $n3->component_name,
+                        'semantic_key' => $n3->semantic_key,
+                        'usage_scope' => $n3->usage_scope,
+                        'entry_mode' => $n3->entry_mode,
+                        'total_role' => $n3->total_role,
+                    ];
                 }
                 $l1Data['children'][] = $l2Data;
             }
@@ -175,10 +197,37 @@
 
                                         <div class="mt-2 space-y-2">
                                             <template x-for="(col, colIndex) in l2.columns" :key="'l3_' + l1Index + '_' + l2Index + '_' + colIndex">
-                                                <div class="flex items-center gap-2">
-                                                    <input type="text" :name="`learning_structure[${l1Index}][children][${l2Index}][columns][${colIndex}]`" x-model="l2.columns[colIndex]" placeholder="e.g. CL" required
-                                                           class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
-                                                    <button type="button" class="text-xs text-gray-500 hover:underline" @click="removeL3('learning', l1Index, l2Index, colIndex)">Remove</button>
+                                                <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                                    <div class="grid gap-2 sm:grid-cols-3">
+                                                        <div>
+                                                            <label class="block text-[11px] text-gray-600 mb-1">Column Name</label>
+                                                            <input type="text" :name="`learning_structure[${l1Index}][children][${l2Index}][columns][${colIndex}][name]`" x-model="col.name" placeholder="e.g. CL" required
+                                                                   class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] text-gray-600 mb-1">Meaning</label>
+                                                            <select :name="`learning_structure[${l1Index}][children][${l2Index}][columns][${colIndex}][semantic_key]`"
+                                                                    x-model="col.semantic_key"
+                                                                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                                <template x-for="option in learningSemanticOptions" :key="option.value">
+                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] text-gray-600 mb-1">Used In</label>
+                                                            <select :name="`learning_structure[${l1Index}][children][${l2Index}][columns][${colIndex}][usage_scope]`"
+                                                                    x-model="col.usage_scope"
+                                                                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                                <template x-for="option in learningUsageScopeOptions" :key="option.value">
+                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-2 flex justify-end">
+                                                        <button type="button" class="text-xs text-gray-500 hover:underline" @click="removeL3('learning', l1Index, l2Index, colIndex)">Remove</button>
+                                                    </div>
                                                 </div>
                                             </template>
                                             <button type="button" class="text-xs text-indigo-700 hover:underline" @click="addL3('learning', l1Index, l2Index)">Add Column</button>
@@ -196,7 +245,7 @@
                 <div class="flex items-start justify-between mb-2">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900">Define Assessment Scheme Structure</h3>
-                        <p class="text-xs text-gray-500">Only include mark components here (FA/SA Max etc).</p>
+                        <p class="text-xs text-gray-500">Define the assessment columns and also what each one means in the workflow.</p>
                     </div>
                     <button type="button" @click="addL1('assessment')"
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition">
@@ -228,10 +277,37 @@
 
                                         <div class="mt-2 space-y-2">
                                             <template x-for="(col, colIndex) in l2.columns" :key="'a3_' + l1Index + '_' + l2Index + '_' + colIndex">
-                                                <div class="flex items-center gap-2">
-                                                    <input type="text" :name="`assessment_structure[${l1Index}][children][${l2Index}][columns][${colIndex}]`" x-model="l2.columns[colIndex]" placeholder="e.g. FA-TH (Max)" required
-                                                           class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
-                                                    <button type="button" class="text-xs text-gray-500 hover:underline" @click="removeL3('assessment', l1Index, l2Index, colIndex)">Remove</button>
+                                                <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                                    <div class="grid gap-2 sm:grid-cols-3">
+                                                        <div class="sm:col-span-1">
+                                                            <label class="block text-[11px] text-gray-600 mb-1">Column Name</label>
+                                                            <input type="text" :name="`assessment_structure[${l1Index}][children][${l2Index}][columns][${colIndex}][name]`" x-model="col.name" placeholder="e.g. FA-TH (Max)" required
+                                                                   class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] text-gray-600 mb-1">Meaning</label>
+                                                            <select :name="`assessment_structure[${l1Index}][children][${l2Index}][columns][${colIndex}][semantic_key]`"
+                                                                    x-model="col.semantic_key"
+                                                                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                                <template x-for="option in semanticOptions" :key="option.value">
+                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-[11px] text-gray-600 mb-1">Used In</label>
+                                                            <select :name="`assessment_structure[${l1Index}][children][${l2Index}][columns][${colIndex}][usage_scope]`"
+                                                                    x-model="col.usage_scope"
+                                                                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                                                                <template x-for="option in usageScopeOptions" :key="option.value">
+                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-2 flex justify-end">
+                                                        <button type="button" class="text-xs text-gray-500 hover:underline" @click="removeL3('assessment', l1Index, l2Index, colIndex)">Remove</button>
+                                                    </div>
                                                 </div>
                                             </template>
                                             <button type="button" class="text-xs text-indigo-700 hover:underline" @click="addL3('assessment', l1Index, l2Index)">Add Column</button>
@@ -265,21 +341,71 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
         {
             name: 'Learning Scheme',
             children: [
-                { name: 'Actual Contact Hours / Week', columns: ['CL', 'TL', 'LL', 'Practical'] },
-                { name: 'Self Learning (Activity / Assignment / Micro Project)', columns: [] },
-                { name: 'Notional Learning Hours / Week', columns: [] },
+                {
+                    name: 'Actual Contact Hours / Week',
+                    columns: [
+                        { name: 'CL', semantic_key: 'th_hours', usage_scope: 'syllabus' },
+                        { name: 'TU', semantic_key: 'tu_hours', usage_scope: 'syllabus' },
+                        { name: 'LL', semantic_key: 'pr_hours', usage_scope: 'syllabus' },
+                    ]
+                },
+                {
+                    name: 'Self Learning (Activity / Assignment / Micro Project)',
+                    columns: [
+                        { name: 'SLH', semantic_key: 'slh_hours', usage_scope: 'syllabus' },
+                    ]
+                },
+                {
+                    name: 'Notional Learning Hours / Week',
+                    columns: [
+                        { name: 'TL', semantic_key: 'total_hours', usage_scope: 'syllabus' },
+                        { name: 'NLH', semantic_key: 'nlh_hours', usage_scope: 'syllabus' },
+                    ]
+                },
             ]
         },
-        { name: 'Credits', children: [] },
+        {
+            name: 'Credits',
+            children: [
+                {
+                    name: 'Summary',
+                    columns: [
+                        { name: 'Credits', semantic_key: 'credits', usage_scope: 'syllabus' },
+                    ]
+                }
+            ],
+        },
     ];
 
     const defaultAssessment = [
         {
             name: 'Assessment Scheme',
             children: [
-                { name: 'Theory', columns: ['FA-TH (Max)', 'SA-TH (Max)'] },
-                { name: 'Practical', columns: ['FA-PR (Max)', 'SA-PR (Max)'] },
-                { name: 'SLA', columns: ['Max (SLA)', 'Min (SLA)'] },
+                {
+                    name: 'Theory',
+                    columns: [
+                        { name: 'FA-TH (Max)', semantic_key: 'fa_th_max', usage_scope: 'course_definition' },
+                        { name: 'FA-TH (Min)', semantic_key: 'fa_th_min', usage_scope: 'course_definition' },
+                        { name: 'SA-TH (Max)', semantic_key: 'sa_th_max', usage_scope: 'course_definition' },
+                        { name: 'SA-TH (Min)', semantic_key: 'sa_th_min', usage_scope: 'course_definition' },
+                    ]
+                },
+                {
+                    name: 'Practical',
+                    columns: [
+                        { name: 'FA-PR (Max)', semantic_key: 'fa_pr_max', usage_scope: 'course_definition' },
+                        { name: 'FA-PR (Min)', semantic_key: 'fa_pr_min', usage_scope: 'course_definition' },
+                        { name: 'SA-PR (Max)', semantic_key: 'sa_pr_max', usage_scope: 'course_definition' },
+                        { name: 'SA-PR (Min)', semantic_key: 'sa_pr_min', usage_scope: 'course_definition' },
+                    ]
+                },
+                {
+                    name: 'SLA',
+                    columns: [
+                        { name: 'Max (SLA)', semantic_key: 'sla_max', usage_scope: 'course_definition' },
+                        { name: 'Min (SLA)', semantic_key: 'sla_min', usage_scope: 'course_definition' },
+                    ]
+                },
             ]
         }
     ];
@@ -291,10 +417,146 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
         sort_order: lv.sort_order || 0,
     }));
 
+    const inferSemanticKey = (name) => {
+        const n = (name || '').trim().toLowerCase();
+
+        if (!n) return '';
+        if (n === 'paper duration' || n.includes('duration') || n.includes('hrs')) return 'paper_duration';
+        if (n.includes('fa-th') && n.includes('min')) return 'fa_th_min';
+        if (n.includes('fa-th')) return 'fa_th_max';
+        if (n.includes('sa-th') && n.includes('min')) return 'sa_th_min';
+        if (n.includes('sa-th')) return 'sa_th_max';
+        if (n.includes('fa-pr') && n.includes('min')) return 'fa_pr_min';
+        if (n.includes('fa-pr')) return 'fa_pr_max';
+        if (n.includes('sa-pr') && n.includes('min')) return 'sa_pr_min';
+        if (n.includes('sa-pr')) return 'sa_pr_max';
+        if (n.includes('sla') && n.includes('min')) return 'sla_min';
+        if (n.includes('sla')) return 'sla_max';
+        if (n.includes('total')) return 'total_marks';
+        if (n.includes('min')) return 'min_marks';
+
+        return '';
+    };
+
+    const inferUsageScope = (semanticKey, name) => {
+        if (semanticKey === 'paper_duration') return 'course_definition';
+        if (semanticKey === 'total_marks') return 'display_only';
+        if (semanticKey.endsWith('_min') || semanticKey === 'min_marks') return 'course_definition';
+
+        const n = (name || '').trim().toLowerCase();
+        if (n.includes('total')) return 'display_only';
+        if (n.includes('min')) return 'course_definition';
+
+        return 'course_definition';
+    };
+
+    const dedupeByName = (arr) => {
+        const seen = new Set();
+        return (arr || []).filter(item => {
+            const key = (item?.name || '').trim().toLowerCase();
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    };
+
+    const normalizeAssessmentStructure = (arr) => dedupeByName((arr || []).map(group => ({
+        name: group.name || '',
+        children: dedupeByName((group.children || []).map(child => ({
+            name: child.name || '',
+            columns: dedupeByName((child.columns || []).map(col => {
+                if (typeof col === 'string') {
+                    const semanticKey = inferSemanticKey(col);
+                    return { name: col, semantic_key: semanticKey, usage_scope: inferUsageScope(semanticKey, col) };
+                }
+
+                const semanticKey = col.semantic_key || inferSemanticKey(col.name || '');
+                return {
+                    name: col.name || '',
+                    semantic_key: semanticKey,
+                    usage_scope: col.usage_scope || inferUsageScope(semanticKey, col.name || ''),
+                };
+            })),
+        }))),
+    })));
+
+    const normalizeLearningSemanticKey = (name) => {
+        const n = (name || '').trim().toLowerCase();
+        if (!n) return '';
+        if (n === 'credits') return 'credits';
+        if (n === 'cl' || n.includes('classroom')) return 'th_hours';
+        if (n === 'tu' || n.includes('tutorial')) return 'tu_hours';
+        if (n === 'll' || n === 'practical' || n.includes('laboratory')) return 'pr_hours';
+        if (n.includes('self learning') || n.includes('slh')) return 'slh_hours';
+        if (n.includes('notional') || n.includes('nlh')) return 'nlh_hours';
+        if (n.includes('total learning') || n === 'tl' || n.includes('total hrs')) return 'total_hours';
+        return '';
+    };
+
+    const normalizeLearningStructure = (arr) => dedupeByName((arr || []).map(group => ({
+        name: group.name || '',
+        children: dedupeByName((group.children || []).map(child => ({
+            name: child.name || '',
+            columns: dedupeByName((child.columns || []).map(col => {
+                if (typeof col === 'string') {
+                    const semanticKey = normalizeLearningSemanticKey(col);
+                    return { name: col, semantic_key: semanticKey, usage_scope: 'syllabus' };
+                }
+
+                const semanticKey = col.semantic_key || normalizeLearningSemanticKey(col.name || '');
+                return {
+                    name: col.name || '',
+                    semantic_key: semanticKey,
+                    usage_scope: col.usage_scope || 'syllabus',
+                };
+            })),
+        }))),
+    })));
+
     return {
         levels: normalizeLevels(initialLevels),
-        learningStructure: (initialLearning && initialLearning.length) ? initialLearning : defaultLearning,
-        assessmentStructure: (initialAssessment && initialAssessment.length) ? initialAssessment : defaultAssessment,
+        learningStructure: (initialLearning && initialLearning.length) ? normalizeLearningStructure(initialLearning) : defaultLearning,
+        assessmentStructure: (initialAssessment && initialAssessment.length) ? normalizeAssessmentStructure(initialAssessment) : defaultAssessment,
+        learningSemanticOptions: [
+            { value: '', label: 'Custom / Not mapped' },
+            { value: 'th_hours', label: 'Theory / CL Hours' },
+            { value: 'tu_hours', label: 'Tutorial Hours' },
+            { value: 'pr_hours', label: 'Practical / LL Hours' },
+            { value: 'total_hours', label: 'Total Learning Hours' },
+            { value: 'slh_hours', label: 'Self Learning Hours' },
+            { value: 'nlh_hours', label: 'Notional Learning Hours' },
+            { value: 'credits', label: 'Credits' },
+        ],
+        learningUsageScopeOptions: [
+            { value: 'syllabus', label: 'Syllabus' },
+            { value: 'course_definition', label: 'Course Definition' },
+            { value: 'display_only', label: 'Display Only' },
+        ],
+        semanticOptions: [
+            { value: '', label: 'Custom / Not mapped' },
+            { value: 'fa_th_max', label: 'FA Theory Max' },
+            { value: 'fa_th_min', label: 'FA Theory Min' },
+            { value: 'sa_th_max', label: 'SA Theory Max' },
+            { value: 'sa_th_min', label: 'SA Theory Min' },
+            { value: 'fa_pr_max', label: 'FA Practical Max' },
+            { value: 'fa_pr_min', label: 'FA Practical Min' },
+            { value: 'sa_pr_max', label: 'SA Practical Max' },
+            { value: 'sa_pr_min', label: 'SA Practical Min' },
+            { value: 'sla_max', label: 'SLA Max' },
+            { value: 'sla_min', label: 'SLA Min' },
+            { value: 'oral_max', label: 'Oral Max' },
+            { value: 'tw_max', label: 'TW Max' },
+            { value: 'paper_duration', label: 'Paper Duration' },
+            { value: 'total_marks', label: 'Total Marks' },
+            { value: 'min_marks', label: 'Generic Min Marks' },
+        ],
+        usageScopeOptions: [
+            { value: 'course_definition', label: 'Course Definition' },
+            { value: 'syllabus', label: 'Syllabus' },
+            { value: 'result', label: 'Result' },
+            { value: 'transcript', label: 'Transcript' },
+            { value: 'display_only', label: 'Display Only' },
+        ],
 
         addLevel() {
             this.levels.push({ id: null, level_code: '', level_name: '', sort_order: 0 });
@@ -323,7 +585,20 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
         },
         addL3(kind, l1Index, l2Index) {
             const target = (kind === 'learning') ? this.learningStructure : this.assessmentStructure;
-            target[l1Index].children[l2Index].columns.push('');
+            if (kind === 'learning') {
+                target[l1Index].children[l2Index].columns.push({
+                    name: '',
+                    semantic_key: '',
+                    usage_scope: 'syllabus',
+                });
+                return;
+            }
+
+            target[l1Index].children[l2Index].columns.push({
+                name: '',
+                semantic_key: '',
+                usage_scope: 'course_definition',
+            });
         },
         removeL3(kind, l1Index, l2Index, l3Index) {
             const target = (kind === 'learning') ? this.learningStructure : this.assessmentStructure;

@@ -58,6 +58,9 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 tw_marks: 0,
                 is_internal_practical: false
             },
+            learning_scheme_rows: [],
+            learning_scheme_leaf_columns: [],
+            learning_scheme_values: [],
             assessment_scheme_rows: [],
             assessment_scheme_leaf_columns: [],
             assessment_scheme_values: [],
@@ -138,6 +141,9 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
                 if (s.examination_scheme) {
                     this.form.examination_scheme = Object.assign({}, this.form.examination_scheme, s.examination_scheme);
                 }
+                this.form.learning_scheme_rows = Array.isArray(s.learning_scheme_rows) ? s.learning_scheme_rows : [];
+                this.form.learning_scheme_leaf_columns = Array.isArray(s.learning_scheme_leaf_columns) ? s.learning_scheme_leaf_columns : [];
+                this.form.learning_scheme_values = Array.isArray(s.learning_scheme_values) ? s.learning_scheme_values : [];
                 this.form.assessment_scheme_rows = Array.isArray(s.assessment_scheme_rows) ? s.assessment_scheme_rows : [];
                 this.form.assessment_scheme_leaf_columns = Array.isArray(s.assessment_scheme_leaf_columns) ? s.assessment_scheme_leaf_columns : [];
                 this.form.assessment_scheme_values = Array.isArray(s.assessment_scheme_values) ? s.assessment_scheme_values : [];
@@ -540,6 +546,9 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             });
 
             this.form.iks_hours = c.iks_hours ?? 0;
+            this.form.learning_scheme_rows = Array.isArray(c.learning_scheme_rows) ? c.learning_scheme_rows : [];
+            this.form.learning_scheme_leaf_columns = Array.isArray(c.learning_scheme_leaf_columns) ? c.learning_scheme_leaf_columns : [];
+            this.form.learning_scheme_values = Array.isArray(c.learning_scheme_values) ? c.learning_scheme_values : [];
             this.form.assessment_scheme_rows = Array.isArray(c.assessment_scheme_rows) ? c.assessment_scheme_rows : [];
             this.form.assessment_scheme_leaf_columns = Array.isArray(c.assessment_scheme_leaf_columns) ? c.assessment_scheme_leaf_columns : [];
             this.form.assessment_scheme_values = Array.isArray(c.assessment_scheme_values) ? c.assessment_scheme_values : [];
@@ -575,6 +584,21 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
             }
 
             const value = match[kind];
+            return value === null || value === undefined || value === '' ? '--' : value;
+        },
+
+        getLearningCellValue(componentId) {
+            const id = parseInt(componentId);
+            if (!Array.isArray(this.form.learning_scheme_values)) {
+                return '--';
+            }
+
+            const match = this.form.learning_scheme_values.find((item) => parseInt(item.component_id) === id);
+            if (!match) {
+                return '--';
+            }
+
+            const value = match.value;
             return value === null || value === undefined || value === '' ? '--' : value;
         },
 
@@ -646,6 +670,18 @@ const syllabusForm = function (initial = null, prefill = null, programmesMetadat
 
         // Calculate Total Marks - Global Standard
         calculateTotalMarks() {
+            if (Array.isArray(this.form.assessment_scheme_values) && this.form.assessment_scheme_values.length > 0) {
+                return this.form.assessment_scheme_values.reduce((total, item) => {
+                    const key = (item.semantic_key || '').toString().toLowerCase();
+                    if (!key || key === 'paper_duration' || key === 'total_marks' || key.endsWith('_min')) {
+                        return total;
+                    }
+
+                    const value = parseInt(item.max_marks);
+                    return total + (Number.isNaN(value) ? 0 : value);
+                }, 0);
+            }
+
             const exam = this.form.examination_scheme;
             let total = 0;
             total += parseInt(exam.fa_th_max) || 0;
