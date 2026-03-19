@@ -8,9 +8,12 @@ use App\Models\Department;
 use App\Models\Notification;
 use App\Models\Programme;
 use App\Models\ProgrammeLevel;
+use App\Models\Scheme;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -43,6 +46,7 @@ class CourseController extends Controller
 
     public function create(Request $request, Programme $programme)
     {
+        $this->ensureAssessmentStructureForCourseEntry($programme);
         $programme->load([
             'levels' => function ($q) {
                 $q->with('structure')->orderBy('sort_order');
@@ -102,6 +106,7 @@ class CourseController extends Controller
     public function edit(Programme $programme, Course $course)
     {
         $this->assertCourseInProgramme($programme, $course);
+        $this->ensureAssessmentStructureForCourseEntry($programme);
         $programme->load([
             'levels' => function ($q) {
                 $q->with('structure')->orderBy('sort_order');
@@ -716,6 +721,105 @@ class CourseController extends Controller
                 ],
             ]);
         }
+    }
+
+    private function ensureAssessmentStructureForCourseEntry(Programme $programme): void
+    {
+        $programme->loadMissing('scheme.assessmentComponents');
+        $scheme = $programme->scheme;
+
+        if (!$scheme) {
+            return;
+        }
+
+        $leafColumns = $scheme->getCourseAssessmentLeafColumns();
+        if (!empty($leafColumns)) {
+            return;
+        }
+
+        $supportsMeta = Schema::hasColumn('scheme_assessment_components', 'value_kind')
+            && Schema::hasColumn('scheme_assessment_components', 'is_input')
+            && Schema::hasColumn('scheme_assessment_components', 'contributes_to_total')
+            && Schema::hasColumn('scheme_assessment_components', 'semantic_key')
+            && Schema::hasColumn('scheme_assessment_components', 'usage_scope')
+            && Schema::hasColumn('scheme_assessment_components', 'entry_mode')
+            && Schema::hasColumn('scheme_assessment_components', 'total_role');
+
+        $displayOrder = 0;
+
+        $assessmentRoot = $scheme->assessmentComponents()->updateOrCreate(
+            ['parent_id' => null, 'component_code' => 'assessment-scheme'],
+            $this->assessmentComponentAttributes('Assessment Scheme', $displayOrder++, null, $supportsMeta)
+        );
+
+        $groups = [
+            'Theory' => [
+                ['name' => 'FA-TH (Max)', 'semantic_key' => 'fa_th_max', 'usage_scope' => 'course_definition', 'total_role' => 'adds_to_total', 'is_input' => true, 'contributes_to_total' => true],
+                ['name' => 'FA-TH (Min)', 'semantic_key' => 'fa_th_min', 'usage_scope' => 'course_definition', 'total_role' => 'min_pass', 'is_input' => true, 'contributes_to_total' => false],
+                ['name' => 'SA-TH (Max)', 'semantic_key' => 'sa_th_max', 'usage_scope' => 'course_definition', 'total_role' => 'adds_to_total', 'is_input' => true, 'contributes_to_total' => true],
+                ['name' => 'SA-TH (Min)', 'semantic_key' => 'sa_th_min', 'usage_scope' => 'course_definition', 'total_role' => 'min_pass', 'is_input' => true, 'contributes_to_total' => false],
+            ],
+            'Practical' => [
+                ['name' => 'FA-PR (Max)', 'semantic_key' => 'fa_pr_max', 'usage_scope' => 'course_definition', 'total_role' => 'adds_to_total', 'is_input' => true, 'contributes_to_total' => true],
+                ['name' => 'FA-PR (Min)', 'semantic_key' => 'fa_pr_min', 'usage_scope' => 'course_definition', 'total_role' => 'min_pass', 'is_input' => true, 'contributes_to_total' => false],
+                ['name' => 'SA-PR (Max)', 'semantic_key' => 'sa_pr_max', 'usage_scope' => 'course_definition', 'total_role' => 'adds_to_total', 'is_input' => true, 'contributes_to_total' => true],
+                ['name' => 'SA-PR (Min)', 'semantic_key' => 'sa_pr_min', 'usage_scope' => 'course_definition', 'total_role' => 'min_pass', 'is_input' => true, 'contributes_to_total' => false],
+            ],
+            'SLA' => [
+                ['name' => 'Max (SLA)', 'semantic_key' => 'sla_max', 'usage_scope' => 'course_definition', 'total_role' => 'adds_to_total', 'is_input' => true, 'contributes_to_total' => true],
+                ['name' => 'Min (SLA)', 'semantic_key' => 'sla_min', 'usage_scope' => 'course_definition', 'total_role' => 'min_pass', 'is_input' => true, 'contributes_to_total' => false],
+            ],
+        ];
+
+        foreach ($groups as $groupName => $columns) {
+            $groupNode = $scheme->assessmentComponents()->updateOrCreate(
+                ['parent_id' => $assessmentRoot->id, 'component_code' => Str::slug('assessment-scheme ' . $groupName)],
+                $this->assessmentComponentAttributes($groupName, $displayOrder++, $assessmentRoot->id, $supportsMeta)
+            );
+
+            foreach ($columns as $column) {
+                $scheme->assessmentComponents()->updateOrCreate(
+                    ['parent_id' => $groupNode->id, 'component_code' => Str::slug('assessment-scheme ' . $groupName . ' ' . $column['name'])],
+                    $this->assessmentComponentAttributes($column['name'], $displayOrder++, $groupNode->id, $supportsMeta, $column)
+                );
+            }
+        }
+
+        $programme->unsetRelation('scheme');
+    }
+
+    private function assessmentComponentAttributes(string $name, int $displayOrder, ?int $parentId, bool $supportsMeta, array $column = []): array
+    {
+        $attributes = [
+            'component_name' => $name,
+            'display_order' => $displayOrder,
+        ];
+
+        if (!$supportsMeta) {
+            return $attributes;
+        }
+
+        if ($parentId === null || $column === []) {
+            return $attributes + [
+                'value_kind' => 'group',
+                'entry_mode' => 'readonly',
+                'total_role' => 'group',
+                'is_input' => false,
+                'contributes_to_total' => false,
+                'usage_scope' => 'display_only',
+                'semantic_key' => null,
+            ];
+        }
+
+        return $attributes + [
+            'usage_scope' => $column['usage_scope'] ?? 'course_definition',
+            'semantic_key' => $column['semantic_key'] ?? null,
+            'value_kind' => 'marks',
+            'entry_mode' => ($column['total_role'] ?? null) === 'derived' ? 'readonly' : 'input',
+            'total_role' => $column['total_role'] ?? 'adds_to_total',
+            'is_input' => $column['is_input'] ?? true,
+            'contributes_to_total' => $column['contributes_to_total'] ?? true,
+        ];
     }
 
     public function apiShow(Request $request, $code)

@@ -174,9 +174,30 @@
         .booklet-table tbody tr:nth-child(even) {
             background: #fcfcfb;
         }
-        .booklet-table.compact tbody td,
-        .booklet-table.compact tfoot th {
+        .booklet-table-compact th,
+        .booklet-table-compact td {
+            padding: 6px 7px;
+        }
+        .booklet-table-compact thead th,
+        .booklet-table-compact tbody td,
+        .booklet-table-compact tfoot th {
             font-size: 0.82rem;
+        }
+        .booklet-table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        .booklet-table-wrap .booklet-table {
+            min-width: max-content;
+        }
+        .glance-table .glance-credits-col,
+        .glance-table .glance-marks-col {
+            min-width: 92px;
+            white-space: nowrap;
+        }
+        .glance-table .glance-marks-col {
+            min-width: 88px;
         }
         .booklet-table tfoot th {
             background: #f5f5f4;
@@ -202,10 +223,30 @@
             .booklet-title {
                 font-size: 1.7rem;
             }
+            .booklet-table-wrap {
+                -webkit-overflow-scrolling: touch;
+            }
             .booklet-table {
-                display: block;
-                overflow-x: auto;
                 white-space: nowrap;
+            }
+            .glance-table .glance-credits-col,
+            .glance-table .glance-marks-col {
+                position: sticky;
+                right: 0;
+                background: inherit;
+                z-index: 1;
+            }
+            .glance-table .glance-credits-col {
+                right: 88px;
+                box-shadow: -1px 0 0 #d6d3d1;
+            }
+            .glance-table .glance-marks-col {
+                box-shadow: -1px 0 0 #d6d3d1;
+            }
+            .glance-table thead .glance-credits-col,
+            .glance-table thead .glance-marks-col {
+                background: #efe7d6;
+                z-index: 2;
             }
         }
     </style>

@@ -99,11 +99,31 @@
         };
 
         $assessmentColspan = max($assessmentLeafColumns->count(), 1);
+        $wideAssessmentScheme = $assessmentLeafColumns->count() >= 8;
+    @endphp
+
+    @php
+        $assessmentDisplayValue = function ($assessment, array $leaf) {
+            if (! $assessment) {
+                return null;
+            }
+
+            $semanticKey = strtolower(trim((string) ($leaf['semantic_key'] ?? '')));
+            $totalRole = strtolower(trim((string) ($leaf['total_role'] ?? '')));
+            $usesMinMarks = $totalRole === 'min_pass'
+                || $semanticKey === 'min_marks'
+                || str_ends_with($semanticKey, '_min');
+
+            return $usesMinMarks
+                ? (is_numeric($assessment->min_marks) ? (int) $assessment->min_marks : null)
+                : (is_numeric($assessment->max_marks) ? (int) $assessment->max_marks : null);
+        };
     @endphp
 
     <section class="booklet-section">
         {!! $renderHeader('Programme Structure', 'Scheme at a Glance') !!}
 
+        <div class="booklet-table-wrap">
         <table class="booklet-table glance-table">
             <thead>
                 <tr>
@@ -115,8 +135,8 @@
                     <th>TU</th>
                     <th>PR</th>
                     <th>Total Hours</th>
-                    <th>Total Credits</th>
-                    <th>Marks</th>
+                    <th class="glance-credits-col">Total Credits</th>
+                    <th class="glance-marks-col">Marks</th>
                 </tr>
             </thead>
             <tbody>
@@ -137,8 +157,8 @@
                         <td class="text-center">{{ $showCellValue($structure?->tu_hours) }}</td>
                         <td class="text-center">{{ $showCellValue($structure?->pr_hours) }}</td>
                         <td class="text-center">{{ $showCellValue($structure?->total_hours) }}</td>
-                        <td class="text-center">{{ $showCredits($structure?->total_credits) }}</td>
-                        <td class="text-center">{{ $showCellValue($structure?->total_marks) }}</td>
+                        <td class="text-center glance-credits-col">{{ $showCredits($structure?->total_credits) }}</td>
+                        <td class="text-center glance-marks-col">{{ $showCellValue($structure?->total_marks) }}</td>
                     </tr>
                 @endforeach
                 <tr class="total-row">
@@ -153,8 +173,8 @@
                     <td class="text-center">{{ $showCellValue($structureTotals['tu']) }}</td>
                     <td class="text-center">{{ $showCellValue($structureTotals['pr']) }}</td>
                     <td class="text-center">{{ $showCellValue($structureTotals['hours']) }}</td>
-                    <td class="text-center">{{ $showCredits($structureTotals['credits']) }}</td>
-                    <td class="text-center">{{ $showCellValue($structureTotals['marks']) }}</td>
+                    <td class="text-center glance-credits-col">{{ $showCredits($structureTotals['credits']) }}</td>
+                    <td class="text-center glance-marks-col">{{ $showCellValue($structureTotals['marks']) }}</td>
                 </tr>
                 @if ($auditSections->isNotEmpty())
                     <tr>
@@ -166,8 +186,8 @@
                         <td class="text-center">{{ $showCellValue($auditTotals['tu']) }}</td>
                         <td class="text-center">{{ $showCellValue($auditTotals['pr']) }}</td>
                         <td class="text-center">{{ $showCellValue($auditTotals['hours']) }}</td>
-                        <td class="text-center">--</td>
-                        <td class="text-center">--</td>
+                        <td class="text-center glance-credits-col">--</td>
+                        <td class="text-center glance-marks-col">--</td>
                     </tr>
                     <tr class="total-row">
                         <td></td>
@@ -178,12 +198,13 @@
                         <td class="text-center">{{ $showCellValue($structureTotals['tu'] + $auditTotals['tu']) }}</td>
                         <td class="text-center">{{ $showCellValue($structureTotals['pr'] + $auditTotals['pr']) }}</td>
                         <td class="text-center">{{ $showCellValue($structureTotals['hours'] + $auditTotals['hours']) }}</td>
-                        <td class="text-center">{{ $showCredits($structureTotals['credits']) }}</td>
-                        <td class="text-center">{{ $showCellValue($structureTotals['marks']) }}</td>
+                        <td class="text-center glance-credits-col">{{ $showCredits($structureTotals['credits']) }}</td>
+                        <td class="text-center glance-marks-col">{{ $showCellValue($structureTotals['marks']) }}</td>
                     </tr>
                 @endif
             </tbody>
         </table>
+        </div>
 
         <div class="booklet-note">
             <strong>Abbreviations :</strong> TH : Theory, TU : Tutorial, PR : Practical.
@@ -198,15 +219,19 @@
             $serial = 1;
 
             $levelRows = $section['courses']->values();
-            $assessmentTotals = $assessmentLeafColumns->mapWithKeys(function ($leaf) use ($levelRows) {
-                return [$leaf['id'] => $levelRows->sum(fn ($row) => (int) ($row['assessment_marks']->get($leaf['id']) ?? 0))];
+            $assessmentTotals = $assessmentLeafColumns->mapWithKeys(function ($leaf) use ($levelRows, $assessmentDisplayValue) {
+                return [$leaf['id'] => $levelRows->sum(function ($row) use ($leaf, $assessmentDisplayValue) {
+                    $assessment = $row['course']->assessments->firstWhere('component_id', $leaf['id']);
+                    return (int) ($assessmentDisplayValue($assessment, $leaf) ?? 0);
+                })];
             });
         @endphp
 
         <section class="booklet-section page-break">
             {!! $renderHeader('Programme Structure', $isAudit ? 'Audit Courses' : 'Level - ' . $level->level_code . ' ' . $level->level_name) !!}
 
-            <table class="booklet-table level-table">
+            <div class="booklet-table-wrap">
+            <table class="booklet-table level-table {{ $wideAssessmentScheme && ! $isAudit ? 'booklet-table-compact' : '' }}">
                 <thead>
                     <tr>
                         <th rowspan="3">Sr. No.</th>
@@ -274,7 +299,10 @@
                                 <td class="text-center">{{ $showCredits($course->credits) }}</td>
                                 <td class="text-center">{{ $showCellValue($course->theory_paper_hrs) }}</td>
                                 @forelse ($assessmentLeafColumns as $leaf)
-                                    <td class="text-center">{{ $showCellValue($row['assessment_marks']->get($leaf['id'])) }}</td>
+                                    @php
+                                        $assessment = $course->assessments->firstWhere('component_id', $leaf['id']);
+                                    @endphp
+                                    <td class="text-center">{{ $showCellValue($assessmentDisplayValue($assessment, $leaf)) }}</td>
                                 @empty
                                     <td class="text-center">--</td>
                                 @endforelse
@@ -307,6 +335,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
 
             <div class="booklet-meta-lines">
                 @if ($isAudit)
@@ -337,10 +366,11 @@
             <div class="booklet-empty">No award class courses have been selected yet.</div>
         @else
             @php
-                $awardAssessmentTotals = $assessmentLeafColumns->mapWithKeys(function ($leaf) use ($awardClassCourses) {
+                $awardAssessmentTotals = $assessmentLeafColumns->mapWithKeys(function ($leaf) use ($awardClassCourses, $assessmentDisplayValue) {
                     return [
-                        $leaf['id'] => $awardClassCourses->sum(function ($item) use ($leaf) {
-                            return (int) (($item->course?->assessments?->pluck('max_marks', 'component_id')->get($leaf['id'])) ?? 0);
+                        $leaf['id'] => $awardClassCourses->sum(function ($item) use ($leaf, $assessmentDisplayValue) {
+                            $assessment = $item->course?->assessments?->firstWhere('component_id', $leaf['id']);
+                            return (int) ($assessmentDisplayValue($assessment, $leaf) ?? 0);
                         }),
                     ];
                 });
@@ -348,7 +378,8 @@
                 $previousElectiveGroup = null;
             @endphp
 
-            <table class="booklet-table level-table">
+            <div class="booklet-table-wrap">
+            <table class="booklet-table level-table {{ $wideAssessmentScheme ? 'booklet-table-compact' : '' }}">
                 <thead>
                     <tr>
                         <th rowspan="3">Sr. No.</th>
@@ -383,7 +414,6 @@
                             $course = $item->course;
                             $isElective = $course?->course_type === \App\Models\Course::TYPE_ELECTIVE;
                             $electiveGroup = $isElective ? ($course?->elective_group ?: 'Elective') : null;
-                            $awardMarks = $course?->assessments?->pluck('max_marks', 'component_id') ?? collect();
                         @endphp
 
                         @if ($isElective && $electiveGroup !== $previousElectiveGroup)
@@ -407,7 +437,10 @@
                             <td class="text-center">{{ $showCredits($course?->credits) }}</td>
                             <td class="text-center">{{ $showCellValue($course?->theory_paper_hrs) }}</td>
                             @forelse ($assessmentLeafColumns as $leaf)
-                                <td class="text-center">{{ $showCellValue($awardMarks->get($leaf['id'])) }}</td>
+                                @php
+                                    $assessment = $course?->assessments?->firstWhere('component_id', $leaf['id']);
+                                @endphp
+                                <td class="text-center">{{ $showCellValue($assessmentDisplayValue($assessment, $leaf)) }}</td>
                             @empty
                                 <td class="text-center">--</td>
                             @endforelse
@@ -432,6 +465,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
 
             <div class="booklet-meta-lines inline">
                 <span>Total Courses : {{ $showCellValue($awardClassCourses->count(), false) }}</span>
@@ -449,6 +483,7 @@
         <section class="booklet-section page-break">
             {!! $renderHeader('Sample Path') !!}
 
+            <div class="booklet-table-wrap">
             <table class="booklet-table sample-path-table">
                 <thead>
                     <tr>
@@ -537,6 +572,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
 
             <div class="booklet-note">
                 Note: Figures in brackets indicate course credits.

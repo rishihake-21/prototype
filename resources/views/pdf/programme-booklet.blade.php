@@ -112,6 +112,23 @@
         .booklet-table tfoot th {
             font-size: 8px;
         }
+        .booklet-table-compact th,
+        .booklet-table-compact td {
+            padding: 3px 4px;
+        }
+        .booklet-table-compact thead th,
+        .booklet-table-compact tbody td,
+        .booklet-table-compact tfoot th {
+            font-size: 7px;
+        }
+        .booklet-table-wrap {
+            width: 100%;
+        }
+        .glance-table .glance-credits-col,
+        .glance-table .glance-marks-col {
+            min-width: 56px;
+            white-space: nowrap;
+        }
         .booklet-table tfoot th {
             background: #f3f4f6;
         }

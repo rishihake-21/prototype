@@ -63,7 +63,7 @@
     $assessmentJson = htmlspecialchars(json_encode($initialAssessment), ENT_QUOTES, 'UTF-8');
 @endphp
 
-<div class="max-w-4xl mx-auto py-8 px-4 sm:px-6">
+<div class="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
     <div class="mb-6">
         <a href="{{ route('cdc.schemes.index') }}" class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline">
             Back to Schemes
@@ -73,10 +73,11 @@
         </h1>
     </div>
 
-    <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl p-6">
+    <div class="bg-white shadow-sm ring-1 ring-gray-200 rounded-2xl p-6 sm:p-8">
         <form method="POST"
               action="{{ $scheme ? route('cdc.schemes.update', $scheme) : route('cdc.schemes.store') }}"
-              x-data="schemeEditor({!! $levelsJson !!}, {!! $learningJson !!}, {!! $assessmentJson !!})">
+              x-data="schemeEditor({!! $levelsJson !!}, {!! $learningJson !!}, {!! $assessmentJson !!})"
+              x-init="initialize()">
             @csrf
             @if($scheme) @method('PUT') @endif
 
@@ -119,52 +120,73 @@
             </div>
 
             <div class="mb-8 pt-6 border-t border-gray-100">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900">Define Level Categories</h3>
-                        <p class="text-xs text-gray-500">These level codes are used when creating Programmes.</p>
+                        <h3 class="text-base font-semibold text-gray-900">Define Level Categories</h3>
+                        <p class="text-sm text-gray-500">These levels will be used later when creating programmes and structure rows.</p>
                     </div>
                     <button type="button" @click="addLevel()"
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition">
+                            class="inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition">
                         Add Level
                     </button>
                 </div>
 
-                <div class="space-y-3">
-                    <template x-for="(lv, idx) in levels" :key="idx">
-                        <div class="grid grid-cols-12 gap-2 items-end">
-                            <div class="col-span-3">
-                                <label class="block text-xs text-gray-600 mb-1">Level Code</label>
-                                <input type="text" :name="`levels[${idx}][level_code]`" x-model="lv.level_code" required
-                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                            </div>
-                            <div class="col-span-6">
-                                <label class="block text-xs text-gray-600 mb-1">Level Name</label>
-                                <input type="text" :name="`levels[${idx}][level_name]`" x-model="lv.level_name" required
-                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                            </div>
-                            <div class="col-span-2">
-                                <label class="block text-xs text-gray-600 mb-1">Sort Order</label>
-                                <input type="number" :name="`levels[${idx}][sort_order]`" x-model.number="lv.sort_order" required
-                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-center">
-                            </div>
-                            <div class="col-span-1 text-right">
-                                <button type="button" class="text-xs text-red-600 hover:underline" @click="removeLevel(idx)">Del</button>
-                            </div>
+                <div class="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 sm:p-5">
+                    <div class="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_140px_80px] gap-3 px-3 pb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 lg:grid">
+                        <div>Level Code</div>
+                        <div>Level Name</div>
+                        <div>Sort Order</div>
+                        <div>Action</div>
+                    </div>
 
-                            <template x-if="lv.id">
-                                <input type="hidden" :name="`levels[${idx}][id]`" :value="lv.id">
-                            </template>
+                    <div class="space-y-3">
+                    <template x-for="(lv, idx) in levels" :key="idx">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_140px_80px] lg:items-end">
+                                <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 lg:hidden">Level Code</label>
+                                <input type="text" :name="`levels[${idx}][level_code]`" x-model="lv.level_code" required
+                                       class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                                </div>
+                                <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 lg:hidden">Level Name</label>
+                                <input type="text" :name="`levels[${idx}][level_name]`" x-model="lv.level_name" required
+                                       class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                                </div>
+                                <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 lg:hidden">Sort Order</label>
+                                <input type="number" :name="`levels[${idx}][sort_order]`" x-model.number="lv.sort_order" required
+                                       class="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-center text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                                </div>
+                                <div class="flex items-end lg:justify-end">
+                                    <button type="button"
+                                            class="w-full rounded-xl border border-red-200 px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 lg:w-auto"
+                                            @click="removeLevel(idx)">
+                                        Remove
+                                    </button>
+                                </div>
+
+                                <template x-if="lv.id">
+                                    <input type="hidden" :name="`levels[${idx}][id]`" :value="lv.id">
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    </div>
+
+                    <template x-if="levels.length === 0">
+                        <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500">
+                            Add at least one level to continue building the scheme.
                         </div>
                     </template>
                 </div>
             </div>
 
             <div class="pt-6 border-t border-gray-100">
-                <div class="flex items-start justify-between mb-2">
+                <div class="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900">Define Learning Scheme Structure</h3>
-                        <p class="text-xs text-gray-500">Hours/week, credits, learning scheme columns.</p>
+                        <p class="text-xs text-gray-500">Hours/week and learning scheme columns only. Credits stay separate in the overall scheme table.</p>
                     </div>
                     <button type="button" @click="addL1('learning')"
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition">
@@ -179,7 +201,7 @@
 
                 <div class="space-y-4">
                     <template x-for="(l1, l1Index) in learningStructure" :key="'l_' + l1Index">
-                        <div class="rounded-lg border border-gray-200 p-4">
+                        <div class="rounded-xl border border-gray-200 p-4 sm:p-5">
                             <div class="flex items-center gap-2">
                                 <input type="text" :name="`learning_structure[${l1Index}][name]`" x-model="l1.name" placeholder="e.g. Learning Scheme" required
                                        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -188,7 +210,7 @@
 
                             <div class="mt-3 space-y-3">
                                 <template x-for="(l2, l2Index) in l1.children" :key="'l2_' + l1Index + '_' + l2Index">
-                                    <div class="rounded-lg bg-gray-50 border border-gray-200 p-3">
+                                    <div class="rounded-xl bg-gray-50 border border-gray-200 p-3 sm:p-4">
                                         <div class="flex items-center gap-2">
                                             <input type="text" :name="`learning_structure[${l1Index}][children][${l2Index}][name]`" x-model="l2.name" placeholder="e.g. Actual Contact Hours / Week" required
                                                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -197,7 +219,7 @@
 
                                         <div class="mt-2 space-y-2">
                                             <template x-for="(col, colIndex) in l2.columns" :key="'l3_' + l1Index + '_' + l2Index + '_' + colIndex">
-                                                <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                                <div class="rounded-xl border border-gray-200 bg-white p-3">
                                                     <div class="grid gap-2 sm:grid-cols-3">
                                                         <div>
                                                             <label class="block text-[11px] text-gray-600 mb-1">Column Name</label>
@@ -210,7 +232,7 @@
                                                                     x-model="col.semantic_key"
                                                                     class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
                                                                 <template x-for="option in learningSemanticOptions" :key="option.value">
-                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                    <option :value="option.value" :selected="col.semantic_key === option.value" x-text="option.label"></option>
                                                                 </template>
                                                             </select>
                                                         </div>
@@ -220,7 +242,7 @@
                                                                     x-model="col.usage_scope"
                                                                     class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
                                                                 <template x-for="option in learningUsageScopeOptions" :key="option.value">
-                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                    <option :value="option.value" :selected="col.usage_scope === option.value" x-text="option.label"></option>
                                                                 </template>
                                                             </select>
                                                         </div>
@@ -242,7 +264,7 @@
             </div>
 
             <div class="pt-6 mt-6 border-t border-gray-100">
-                <div class="flex items-start justify-between mb-2">
+                <div class="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900">Define Assessment Scheme Structure</h3>
                         <p class="text-xs text-gray-500">Define the assessment columns and also what each one means in the workflow.</p>
@@ -259,7 +281,7 @@
 
                 <div class="space-y-4">
                     <template x-for="(l1, l1Index) in assessmentStructure" :key="'a_' + l1Index">
-                        <div class="rounded-lg border border-gray-200 p-4">
+                        <div class="rounded-xl border border-gray-200 p-4 sm:p-5">
                             <div class="flex items-center gap-2">
                                 <input type="text" :name="`assessment_structure[${l1Index}][name]`" x-model="l1.name" placeholder="e.g. Assessment Scheme" required
                                        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -268,7 +290,7 @@
 
                             <div class="mt-3 space-y-3">
                                 <template x-for="(l2, l2Index) in l1.children" :key="'a2_' + l1Index + '_' + l2Index">
-                                    <div class="rounded-lg bg-gray-50 border border-gray-200 p-3">
+                                    <div class="rounded-xl bg-gray-50 border border-gray-200 p-3 sm:p-4">
                                         <div class="flex items-center gap-2">
                                             <input type="text" :name="`assessment_structure[${l1Index}][children][${l2Index}][name]`" x-model="l2.name" placeholder="e.g. Theory" required
                                                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -277,7 +299,7 @@
 
                                         <div class="mt-2 space-y-2">
                                             <template x-for="(col, colIndex) in l2.columns" :key="'a3_' + l1Index + '_' + l2Index + '_' + colIndex">
-                                                <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                                <div class="rounded-xl border border-gray-200 bg-white p-3">
                                                     <div class="grid gap-2 sm:grid-cols-3">
                                                         <div class="sm:col-span-1">
                                                             <label class="block text-[11px] text-gray-600 mb-1">Column Name</label>
@@ -290,7 +312,7 @@
                                                                     x-model="col.semantic_key"
                                                                     class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
                                                                 <template x-for="option in semanticOptions" :key="option.value">
-                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                    <option :value="option.value" :selected="col.semantic_key === option.value" x-text="option.label"></option>
                                                                 </template>
                                                             </select>
                                                         </div>
@@ -300,7 +322,7 @@
                                                                     x-model="col.usage_scope"
                                                                     class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
                                                                 <template x-for="option in usageScopeOptions" :key="option.value">
-                                                                    <option :value="option.value" x-text="option.label"></option>
+                                                                    <option :value="option.value" :selected="col.usage_scope === option.value" x-text="option.label"></option>
                                                                 </template>
                                                             </select>
                                                         </div>
@@ -318,6 +340,110 @@
                             </div>
                         </div>
                     </template>
+                </div>
+            </div>
+
+            <div class="mt-8 border-t border-gray-100 pt-6">
+                <div class="mb-4">
+                    <h3 class="text-base font-semibold text-gray-900">Live Scheme Preview</h3>
+                    <p class="mt-1 text-sm text-gray-500">This preview updates while you edit. It shows the level list and the tabular scheme structure that will be created.</p>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="rounded-2xl border border-gray-200 overflow-hidden">
+                        <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                            <h4 class="text-sm font-semibold text-gray-900">Level Preview</h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-white">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Level Code</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Level Name</th>
+                                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Sort Order</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <template x-if="sortedLevels.length === 0">
+                                        <tr>
+                                            <td colspan="3" class="px-4 py-8 text-center text-gray-500">No levels added yet.</td>
+                                        </tr>
+                                    </template>
+                                    <template x-for="(lv, idx) in sortedLevels" :key="'preview-level-' + idx">
+                                        <tr class="bg-white">
+                                            <td class="px-4 py-3 font-semibold text-gray-900" x-text="lv.level_code || '-'"></td>
+                                            <td class="px-4 py-3 text-gray-600" x-text="lv.level_name || '-'"></td>
+                                            <td class="px-4 py-3 text-gray-600" x-text="lv.sort_order ?? '-'"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div class="rounded-2xl border border-gray-200 overflow-hidden">
+                            <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                                <h4 class="text-sm font-semibold text-gray-900">Learning Structure Preview</h4>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-white">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Group</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Sub Group</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Columns</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <template x-if="learningPreviewRows.length === 0">
+                                            <tr>
+                                                <td colspan="3" class="px-4 py-8 text-center text-gray-500">No learning structure defined yet.</td>
+                                            </tr>
+                                        </template>
+                                        <template x-for="(row, idx) in learningPreviewRows" :key="'learning-preview-' + idx">
+                                            <tr class="bg-white align-top">
+                                                <td class="px-4 py-3 font-semibold text-gray-900" x-text="row.group"></td>
+                                                <td class="px-4 py-3 text-gray-600" x-text="row.child"></td>
+                                                <td class="px-4 py-3 text-gray-600" x-text="row.columns"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-gray-200 overflow-hidden">
+                            <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                                <h4 class="text-sm font-semibold text-gray-900">Assessment Structure Preview</h4>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-white">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Group</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Sub Group</th>
+                                            <th class="px-4 py-3 text-left font-semibold text-gray-600">Columns</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <template x-if="assessmentPreviewRows.length === 0">
+                                            <tr>
+                                                <td colspan="3" class="px-4 py-8 text-center text-gray-500">No assessment structure defined yet.</td>
+                                            </tr>
+                                        </template>
+                                        <template x-for="(row, idx) in assessmentPreviewRows" :key="'assessment-preview-' + idx">
+                                            <tr class="bg-white align-top">
+                                                <td class="px-4 py-3 font-semibold text-gray-900" x-text="row.group"></td>
+                                                <td class="px-4 py-3 text-gray-600" x-text="row.child"></td>
+                                                <td class="px-4 py-3 text-gray-600" x-text="row.columns"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -363,17 +489,6 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
                     ]
                 },
             ]
-        },
-        {
-            name: 'Credits',
-            children: [
-                {
-                    name: 'Summary',
-                    columns: [
-                        { name: 'Credits', semantic_key: 'credits', usage_scope: 'syllabus' },
-                    ]
-                }
-            ],
         },
     ];
 
@@ -483,7 +598,6 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
     const normalizeLearningSemanticKey = (name) => {
         const n = (name || '').trim().toLowerCase();
         if (!n) return '';
-        if (n === 'credits') return 'credits';
         if (n === 'cl' || n.includes('classroom')) return 'th_hours';
         if (n === 'tu' || n.includes('tutorial')) return 'tu_hours';
         if (n === 'll' || n === 'practical' || n.includes('laboratory')) return 'pr_hours';
@@ -509,14 +623,24 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
                     semantic_key: semanticKey,
                     usage_scope: col.usage_scope || 'syllabus',
                 };
-            })),
-        }))),
-    })));
+            })).filter(col => (col.semantic_key || '') !== 'credits'),
+        })).filter(child => (child.columns || []).length > 0)),
+    })).filter(group => {
+        const groupName = (group.name || '').trim().toLowerCase();
+        return groupName !== 'credits' && (group.children || []).length > 0;
+    }));
+
+    const hasUsableStructure = (groups) => (groups || []).some(group =>
+        (group.children || []).some(child => (child.columns || []).length > 0)
+    );
+
+    const normalizedLearning = normalizeLearningStructure(initialLearning);
+    const normalizedAssessment = normalizeAssessmentStructure(initialAssessment);
 
     return {
         levels: normalizeLevels(initialLevels),
-        learningStructure: (initialLearning && initialLearning.length) ? normalizeLearningStructure(initialLearning) : defaultLearning,
-        assessmentStructure: (initialAssessment && initialAssessment.length) ? normalizeAssessmentStructure(initialAssessment) : defaultAssessment,
+        learningStructure: hasUsableStructure(normalizedLearning) ? normalizedLearning : defaultLearning,
+        assessmentStructure: hasUsableStructure(normalizedAssessment) ? normalizedAssessment : defaultAssessment,
         learningSemanticOptions: [
             { value: '', label: 'Custom / Not mapped' },
             { value: 'th_hours', label: 'Theory / CL Hours' },
@@ -525,7 +649,6 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
             { value: 'total_hours', label: 'Total Learning Hours' },
             { value: 'slh_hours', label: 'Self Learning Hours' },
             { value: 'nlh_hours', label: 'Notional Learning Hours' },
-            { value: 'credits', label: 'Credits' },
         ],
         learningUsageScopeOptions: [
             { value: 'syllabus', label: 'Syllabus' },
@@ -557,6 +680,67 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
             { value: 'transcript', label: 'Transcript' },
             { value: 'display_only', label: 'Display Only' },
         ],
+        get sortedLevels() {
+            return [...this.levels].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        },
+        toPreviewRows(structure) {
+            return (structure || []).flatMap(group => {
+                const children = group.children || [];
+                if (!children.length) {
+                    return [{
+                        group: group.name || '-',
+                        child: '-',
+                        columns: '-',
+                    }];
+                }
+
+                return children.map(child => ({
+                    group: group.name || '-',
+                    child: child.name || '-',
+                    columns: (child.columns || [])
+                        .map(col => (typeof col === 'string' ? col : col.name) || '-')
+                        .filter(Boolean)
+                        .join(', ') || '-',
+                }));
+            });
+        },
+        get learningPreviewRows() {
+            return this.toPreviewRows(this.learningStructure);
+        },
+        get assessmentPreviewRows() {
+            return this.toPreviewRows(this.assessmentStructure);
+        },
+        initialize() {
+            this.learningStructure.forEach(group => {
+                (group.children || []).forEach(child => {
+                    (child.columns || []).forEach(col => this.hydrateLearningColumn(col));
+                });
+            });
+
+            this.assessmentStructure.forEach(group => {
+                (group.children || []).forEach(child => {
+                    (child.columns || []).forEach(col => this.hydrateAssessmentColumn(col));
+                });
+            });
+        },
+        hydrateLearningColumn(col) {
+            if (!col) return;
+            if (!col.semantic_key) {
+                col.semantic_key = normalizeLearningSemanticKey(col.name || '');
+            }
+            if (!col.usage_scope) {
+                col.usage_scope = col.semantic_key ? 'syllabus' : 'display_only';
+            }
+        },
+        hydrateAssessmentColumn(col) {
+            if (!col) return;
+            if (!col.semantic_key) {
+                col.semantic_key = inferSemanticKey(col.name || '');
+            }
+            if (!col.usage_scope) {
+                col.usage_scope = inferUsageScope(col.semantic_key, col.name || '');
+            }
+        },
 
         addLevel() {
             this.levels.push({ id: null, level_code: '', level_name: '', sort_order: 0 });
@@ -586,19 +770,23 @@ function schemeEditor(initialLevels, initialLearning, initialAssessment) {
         addL3(kind, l1Index, l2Index) {
             const target = (kind === 'learning') ? this.learningStructure : this.assessmentStructure;
             if (kind === 'learning') {
-                target[l1Index].children[l2Index].columns.push({
+                const col = {
                     name: '',
                     semantic_key: '',
                     usage_scope: 'syllabus',
-                });
+                };
+                this.hydrateLearningColumn(col);
+                target[l1Index].children[l2Index].columns.push(col);
                 return;
             }
 
-            target[l1Index].children[l2Index].columns.push({
+            const col = {
                 name: '',
                 semantic_key: '',
                 usage_scope: 'course_definition',
-            });
+            };
+            this.hydrateAssessmentColumn(col);
+            target[l1Index].children[l2Index].columns.push(col);
         },
         removeL3(kind, l1Index, l2Index, l3Index) {
             const target = (kind === 'learning') ? this.learningStructure : this.assessmentStructure;

@@ -135,23 +135,38 @@
 
                         {{-- Compulsory Courses --}}
                         <td class="px-3 py-2 border border-gray-200">
-                            <input type="number" name="rows[{{ $level->id }}][compulsory_count]"
-                                   x-model.number="comp" min="0"
-                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                            @if($level->isAudit())
+                                <span class="text-[10px] text-gray-400 italic bg-gray-100 px-2 py-1 rounded">N/A</span>
+                                <input type="hidden" name="rows[{{ $level->id }}][compulsory_count]" value="0">
+                            @else
+                                <input type="number" name="rows[{{ $level->id }}][compulsory_count]"
+                                       x-model.number="comp" min="0"
+                                       class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                            @endif
                         </td>
 
                         {{-- Elective Courses --}}
                         <td class="px-3 py-2 border border-gray-200">
-                            <input type="number" name="rows[{{ $level->id }}][elective_offered_count]"
-                                   x-model.number="elecOffered" min="0"
-                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                            @if($level->isAudit())
+                                <span class="text-[10px] text-gray-400 italic bg-gray-100 px-2 py-1 rounded">N/A</span>
+                                <input type="hidden" name="rows[{{ $level->id }}][elective_offered_count]" value="0">
+                            @else
+                                <input type="number" name="rows[{{ $level->id }}][elective_offered_count]"
+                                       x-model.number="elecOffered" min="0"
+                                       class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                            @endif
                         </td>
 
                         {{-- Elective Courses To Complete --}}
                         <td class="px-3 py-2 border border-gray-200">
-                            <input type="number" name="rows[{{ $level->id }}][elective_count]"
-                                   x-model.number="elecToComplete" min="0"
-                                   class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                            @if($level->isAudit())
+                                <span class="text-[10px] text-gray-400 italic bg-gray-100 px-2 py-1 rounded">N/A</span>
+                                <input type="hidden" name="rows[{{ $level->id }}][elective_count]" value="0">
+                            @else
+                                <input type="number" name="rows[{{ $level->id }}][elective_count]"
+                                       x-model.number="elecToComplete" min="0"
+                                       class="w-14 text-center rounded border border-gray-200 text-sm px-1 py-1 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-gray-50">
+                            @endif
                         </td>
 
                         {{-- TH --}}

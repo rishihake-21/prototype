@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\CourseAssignment;
+use App\Models\Course;
 use App\Models\Syllabus;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -147,6 +149,7 @@ class DashboardController extends Controller
     public function approver()
     {
         $user = auth()->user();
+        $department = $user->headedDepartment ?: $user->departments()->first();
 
         // Use the centralized approver scope which already
         // filters by status and associated departments.
@@ -203,6 +206,72 @@ class DashboardController extends Controller
                 ->take(10)
                 ->get();
 
-        return view('dashboard.approver', compact('stats', 'reviewQueue', 'handoffs', 'assignments'));
+        $selectedElectives = collect();
+        $electivePoolCourses = collect();
+        $faculty = collect();
+        $currentAcademicYear = date('Y') . '-' . (date('y') + 1);
+
+        if ($department) {
+            $faculty = $department->users()
+                ->where('role', \App\Models\User::ROLE_FACULTY)
+                ->orderBy('name')
+                ->get();
+
+            $selectedElectives = CourseAssignment::query()
+                ->where('department_id', $department->id)
+                ->where('academic_year', '>=', $currentAcademicYear)
+                ->whereHas('course', fn ($query) => $query->where('course_type', Course::TYPE_ELECTIVE))
+                ->with(['course.programme', 'course.level', 'faculty', 'syllabi' => fn ($query) => $query->latest()])
+                ->latest()
+                ->get();
+
+            $directCourseIds = Course::whereHas('programme', function ($query) use ($department) {
+                $query->where('department_id', $department->id);
+            })->pluck('id');
+
+            $mappedCourseIds = DB::table('course_programme_departments')
+                ->where('department_id', $department->id)
+                ->pluck('course_id');
+
+            $allCourseIds = $directCourseIds->merge($mappedCourseIds)->unique();
+
+            $selectedElectiveIds = CourseAssignment::query()
+                ->where('department_id', $department->id)
+                ->where('academic_year', $currentAcademicYear)
+                ->whereHas('course', fn ($query) => $query->where('course_type', Course::TYPE_ELECTIVE))
+                ->pluck('course_id');
+
+            $electivePoolCourses = Course::query()
+                ->whereIn('id', $allCourseIds)
+                ->where('course_type', Course::TYPE_ELECTIVE)
+                ->whereNotIn('id', $selectedElectiveIds)
+                ->with(['programme', 'level.structure'])
+                ->get()
+                ->sortBy(fn ($course) => ($course->level->sort_order ?? 0) . $course->course_code)
+                ->values();
+
+            $stats['selected_electives'] = $selectedElectives->where('academic_year', $currentAcademicYear)->count();
+            $stats['elective_pool_available'] = $electivePoolCourses->count();
+        } else {
+            $stats['selected_electives'] = 0;
+            $stats['elective_pool_available'] = 0;
+        }
+
+        $regularAssignments = $assignments->filter(
+            fn (CourseAssignment $assignment) => $assignment->course && $assignment->course->course_type !== Course::TYPE_ELECTIVE
+        )->values();
+
+        return view('dashboard.approver', compact(
+            'stats',
+            'reviewQueue',
+            'handoffs',
+            'assignments',
+            'regularAssignments',
+            'department',
+            'faculty',
+            'currentAcademicYear',
+            'electivePoolCourses',
+            'selectedElectives'
+        ));
     }
 }

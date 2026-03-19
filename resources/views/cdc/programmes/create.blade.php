@@ -46,7 +46,7 @@
             {{-- Scheme Selection --}}
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1" for="scheme_id">
-                    MSBTE Scheme <span class="text-red-500">*</span>
+                    Scheme <span class="text-red-500">*</span>
                 </label>
                 <select id="scheme_id" name="scheme_id" required
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 @error('scheme_id') border-red-400 @enderror"
@@ -131,7 +131,7 @@
                     <div>
                         <h4 class="text-sm font-bold">Curriculum Levels Automatically Applied</h4>
                         <p class="text-xs text-indigo-600/80 mt-1 leading-relaxed">
-                            Based on the <strong>MSBTE Scheme</strong> you select above, the system will automatically inject that scheme's mandated course levels (e.g. Basic Sciences, Program Core, Audit, etc.) into this programme's structure. You do not need to build the hierarchy manually.
+                            Based on the <strong>scheme</strong> you select above, the system will automatically inject that scheme's mandated course levels (e.g. Basic Sciences, Program Core, Audit, etc.) into this programme's structure. You do not need to build the hierarchy manually.
                         </p>
                     </div>
                 </div>
