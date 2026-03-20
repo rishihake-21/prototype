@@ -174,34 +174,63 @@
 </div>
 
 <!-- Review Modal -->
-<div id="reviewModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden" id="my-modal">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Review Syllabus</h3>
-            <form action="{{ route('syllabi.approve', $syllabus) }}" method="POST" id="approveForm">
-                @csrf
-                @method('PATCH')
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700">Action</label>
-                    <select name="action" id="reviewAction" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" onchange="toggleComments()">
-                        <option value="approve">Approve</option>
-                        <option value="request_changes">Request Changes</option>
-                        <option value="reject">Reject</option>
-                    </select>
+<div id="reviewModal" class="fixed inset-0 z-50 hidden bg-gray-900/60 px-4 py-6 sm:px-6">
+    <div class="mx-auto flex h-full max-w-7xl items-start justify-center">
+        <div class="w-full overflow-hidden rounded-2xl bg-white shadow-2xl" x-data='syllabusForm(@json($syllabus->toArray()))' x-init="init()">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Review Syllabus</h3>
+                    <p class="mt-1 text-sm text-gray-500">{{ $syllabus->course_code }} - {{ $syllabus->title }}</p>
                 </div>
-                <div class="mb-4" id="commentsSection" style="display: none;">
-                    <label class="block text-sm font-medium text-gray-700" id="commentsLabel">Comments</label>
-                    <textarea name="comments" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Please provide feedback for the creator..."></textarea>
+                <button type="button" onclick="hideReviewModal()" class="rounded-md px-3 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    Close
+                </button>
+            </div>
+
+            <div class="grid max-h-[calc(100vh-6rem)] grid-cols-1 lg:grid-cols-[380px,minmax(0,1fr)]">
+                <div class="overflow-y-auto border-b border-gray-200 p-6 lg:border-b-0 lg:border-r">
+                    <div class="mb-5 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Reviewing</div>
+                        <div class="mt-2 text-sm font-medium text-gray-900">{{ $syllabus->course_code }}</div>
+                        <div class="text-sm text-gray-700">{{ $syllabus->title }}</div>
+                        <div class="mt-3 text-xs text-gray-600">
+                            Created by {{ $syllabus->creator->name }} for {{ $syllabus->academic_year }}
+                        </div>
+                    </div>
+
+                    <form action="{{ route('syllabi.approve', $syllabus) }}" method="POST" id="approveForm">
+                        @csrf
+                        @method('PATCH')
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Action</label>
+                            <select name="action" id="reviewAction" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" onchange="toggleComments()">
+                                <option value="approve">Approve</option>
+                                <option value="request_changes">Request Changes</option>
+                                <option value="reject">Reject</option>
+                            </select>
+                        </div>
+                        <div class="mb-4" id="commentsSection" style="display: none;">
+                            <label class="block text-sm font-medium text-gray-700" id="commentsLabel">Comments</label>
+                            <textarea name="comments" rows="8" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Please provide feedback for the creator..."></textarea>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <button type="button" onclick="hideReviewModal()" class="rounded-md bg-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-400">
+                                Cancel
+                            </button>
+                            <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">
+                                Submit Review
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="hideReviewModal()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400">
-                        Cancel
-                    </button>
-                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
-                        Submit Review
-                    </button>
+
+                <div class="overflow-y-auto bg-gray-100 p-4 sm:p-6">
+                    <h4 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-600">Syllabus Preview While Reviewing</h4>
+                    <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+                        @include('syllabi.partials.live-preview')
+                    </div>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>

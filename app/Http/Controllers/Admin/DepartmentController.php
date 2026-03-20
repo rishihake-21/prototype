@@ -66,7 +66,7 @@ class DepartmentController extends Controller
         // Check if department has users or syllabi
         if ($department->users()->count() > 0 || $department->syllabi()->count() > 0) {
             return redirect()->route('admin.departments.index')
-                ->with('error', 'Cannot delete department with associated users or syllabi.');
+                ->with('error', 'Cannot delete department with associated users or syllabus.');
         }
 
         $department->delete();

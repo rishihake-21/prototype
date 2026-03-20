@@ -108,7 +108,7 @@ class SyllabusController extends Controller
     {
         if (auth()->user()->isFaculty() && !$request->filled('assignment_id')) {
             return redirect()->route('dashboard.creator')
-                ->with('error', 'Faculty syllabi must be created from an HOD assignment.');
+                ->with('error', 'Faculty syllabus must be created from an HOD assignment.');
         }
 
         if (auth()->user()->isFaculty()) {
@@ -201,7 +201,7 @@ class SyllabusController extends Controller
 
         if (!$syllabus->isDraft()) {
             return redirect()->back()
-                ->with('error', 'Only draft syllabi can be deleted.');
+                ->with('error', 'Only draft syllabus can be deleted.');
         }
 
         $syllabus->delete();
@@ -218,7 +218,7 @@ class SyllabusController extends Controller
 
         if (!$syllabus->isApproved()) {
             return redirect()->back()
-                ->with('error', 'Only approved syllabi can be cloned.');
+                ->with('error', 'Only approved syllabus can be cloned.');
         }
 
         $clone = $this->syllabusService->clone($syllabus, auth()->user());
@@ -335,7 +335,7 @@ class SyllabusController extends Controller
     public function downloadPdf(Syllabus $syllabus)
     {
         if (!$syllabus->isApproved()) {
-            abort(403, 'Only approved syllabi can be downloaded.');
+            abort(403, 'Only approved syllabus can be downloaded.');
         }
 
         if (!$this->syllabusService->canView($syllabus, auth()->user())) {
@@ -348,7 +348,7 @@ class SyllabusController extends Controller
     public function downloadDocx(Syllabus $syllabus)
     {
         if (!$syllabus->isApproved()) {
-            abort(403, 'Only approved syllabi can be downloaded.');
+            abort(403, 'Only approved syllabus can be downloaded.');
         }
 
         if (!$this->syllabusService->canView($syllabus, auth()->user())) {
@@ -358,4 +358,3 @@ class SyllabusController extends Controller
         return $this->docxService->download($syllabus);
     }
 }
-

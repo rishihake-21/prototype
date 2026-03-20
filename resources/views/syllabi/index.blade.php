@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                My Syllabi
+                My Syllabus
             </h2>
             <a href="{{ route('syllabi.create') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
                 + Create New
@@ -27,7 +27,7 @@
                 </form>
             </div>
 
-            <!-- Syllabi List -->
+            <!-- Syllabus List -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
                     @if($syllabi->count() > 0)
@@ -83,7 +83,7 @@
                             {{ $syllabi->links() }}
                         </div>
                     @else
-                        <p class="text-gray-500">No syllabi found.</p>
+                        <p class="text-gray-500">No syllabus found.</p>
                     @endif
                 </div>
             </div>
